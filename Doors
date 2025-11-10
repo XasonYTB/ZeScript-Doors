@@ -101,7 +101,7 @@ local antiSpeedEnabled = false
 local antiSpeedLoop
 local clonedCollision
 
-if currentFloor == "Hotel" or currentFloor == "Unknown" then
+if not currentFloor == "Mines" then
     ExploitCategory:Toggle("AntiSpeed Bypass", false, function(enabled)
     antiSpeedEnabled = enabled
     
