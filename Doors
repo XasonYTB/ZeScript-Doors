@@ -379,6 +379,22 @@ local autoProxiEnabled = false
 local autoProxiLoop
 
 -- Auto Proxi Toggle (Universal)
+local UserInputService = game:GetService("UserInputService")
+local isRKeyHeld = false
+
+-- Track R key state
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.KeyCode == Enum.KeyCode.R and not gameProcessed then
+        isRKeyHeld = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if input.KeyCode == Enum.KeyCode.R then
+        isRKeyHeld = false
+    end
+end)
+
 ExploitCategory:Toggle("Auto Proxi", false, function(enabled)
     autoProxiEnabled = enabled
     
@@ -387,6 +403,11 @@ ExploitCategory:Toggle("Auto Proxi", false, function(enabled)
             while autoProxiEnabled do
                 task.wait(0.34)
                 pcall(function()
+                    -- Only run if R key is held
+                    if not isRKeyHeld then
+                        return
+                    end
+                    
                     local Players = game:GetService("Players")
                     local LocalPlayer = Players.LocalPlayer
                     local Character = LocalPlayer and LocalPlayer.Character
