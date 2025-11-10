@@ -451,21 +451,19 @@ end)
 table.insert(uiElements.Universal, fullbrightToggle)
 
 -- FOV Slider (Universal)
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer
+local RunService = game:GetService("RunService")
 local desiredFOV = 70
-local fovLoop
+local fovConnection
 
-fovLoop = task.spawn(function()
-    while true do
-        pcall(function()
-            local camera = workspace.CurrentCamera
-            if camera and camera.FieldOfView ~= desiredFOV then
-                camera.FieldOfView = desiredFOV
-            end
-        end)
-        task.wait(0.1)
-    end
+-- Strong FOV enforcement: use RenderStepped to set the camera FOV every frame.
+-- RenderStepped runs before the frame is rendered, making it harder for the game to override between ticks.
+fovConnection = RunService.RenderStepped:Connect(function()
+    pcall(function()
+        local camera = workspace.CurrentCamera
+        if camera and camera.FieldOfView ~= desiredFOV then
+            camera.FieldOfView = desiredFOV
+        end
+    end)
 end)
 
 VisualCategory:Slider("FOV", 70, 120, 70, function(value)
