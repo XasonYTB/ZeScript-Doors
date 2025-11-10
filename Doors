@@ -289,7 +289,7 @@ end)
 table.insert(uiElements.Universal, speedToggle)
 
 -- Speed Slider (Universal)
-ExploitCategory:Slider("Speed Value", 16, 100, 16, function(value)
+ExploitCategory:Slider("Speed Value", 2, 250, 16, function(value)
     speedValue = value
 end)
 
