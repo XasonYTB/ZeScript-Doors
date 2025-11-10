@@ -24,6 +24,9 @@ local function detectFloor()
     return currentFloor
 end
 
+-- Detect floor at start
+currentFloor = detectFloor()
+
 -- Create Exploit Category
 local ExploitCategory = Window:CreateCategory("Exploits", "⚡")
 
@@ -31,7 +34,7 @@ local ExploitCategory = Window:CreateCategory("Exploits", "⚡")
 local spoofCrouchEnabled = false
 local spoofCrouchLoop
 
--- Store UI elements to show/hide
+-- Store UI elements reference (no longer needed for visibility)
 local uiElements = {
     Hotel = {},
     Mines = {},
@@ -39,7 +42,7 @@ local uiElements = {
 }
 
 -- Spoof Crouch Toggle (Universal)
-local spoofCrouchToggle = ExploitCategory:Toggle("Spoof Crouch", false, function(enabled)
+ExploitCategory:Toggle("Spoof Crouch", false, function(enabled)
     spoofCrouchEnabled = enabled
     
     if enabled then
@@ -58,13 +61,12 @@ local spoofCrouchToggle = ExploitCategory:Toggle("Spoof Crouch", false, function
         end
     end
 end)
-table.insert(uiElements.Universal, spoofCrouchToggle)
 
--- Disable Screech Toggle (Hotel only)
+-- AntiSpeed Bypass Toggle (Hotel only)
 local screechDisabled = false
 local screechOriginalParent = nil
 
-local screechToggle = ExploitCategory:Toggle("Disable Screech", false, function(enabled)
+ExploitCategory:Toggle("Disable Screech", false, function(enabled)
     screechDisabled = enabled
     
     pcall(function()
@@ -93,14 +95,14 @@ local screechToggle = ExploitCategory:Toggle("Disable Screech", false, function(
         end
     end)
 end)
-table.insert(uiElements.Universal, screechToggle)
 
 -- AntiSpeed Bypass Toggle (Hotel only)
 local antiSpeedEnabled = false
 local antiSpeedLoop
 local clonedCollision
 
-local antiSpeedToggle = ExploitCategory:Toggle("AntiSpeed Bypass", false, function(enabled)
+if currentFloor == "Hotel" or currentFloor == "Unknown" then
+    ExploitCategory:Toggle("AntiSpeed Bypass", false, function(enabled)
     antiSpeedEnabled = enabled
     
     if enabled then
@@ -146,14 +148,15 @@ local antiSpeedToggle = ExploitCategory:Toggle("AntiSpeed Bypass", false, functi
         end
     end
 end)
-table.insert(uiElements.Hotel, antiSpeedToggle)
+end
 
 -- Mines Anticheat Bypass (Mines only)
 local bypassEnabled = false
 local bypassLoop
 local ladderESP = {}
 
-local minesBypassToggle = ExploitCategory:Toggle("Anticheat Bypass (Mines)", false, function(enabled)
+if currentFloor == "Mines" or currentFloor == "Unknown" then
+    ExploitCategory:Toggle("Anticheat Bypass (Mines)", false, function(enabled)
     bypassEnabled = enabled
     
     if enabled then
@@ -210,7 +213,7 @@ local minesBypassToggle = ExploitCategory:Toggle("Anticheat Bypass (Mines)", fal
         ladderESP = {}
     end
 end)
-table.insert(uiElements.Mines, minesBypassToggle)
+end
 
 -- Speed System Variables
 local speedEnabled = false
@@ -219,7 +222,7 @@ local speedValue = 16
 local speedLoop
 
 -- Speed Toggle (Universal)
-local speedToggle = ExploitCategory:Toggle("Speed", false, function(enabled)
+ExploitCategory:Toggle("Speed", false, function(enabled)
     if enabled and not antiSpeedEnabled and not bypassEnabled then
         Window:Notify({
             Text = "Please enable a bypass first! (AntiSpeed for Hotel, Anticheat for Mines)",
@@ -286,17 +289,16 @@ end)
 table.insert(uiElements.Universal, speedToggle)
 
 -- Speed Slider (Universal)
-local speedSlider = ExploitCategory:Slider("Speed Value", 16, 100, 16, function(value)
+ExploitCategory:Slider("Speed Value", 16, 100, 16, function(value)
     speedValue = value
 end)
-table.insert(uiElements.Universal, speedSlider)
 
 -- Fly and Noclip (Universal)
 local flyEnabled = false
 local noclipEnabled = false
 local flyLoop
 
-local flyToggle = ExploitCategory:Toggle("Fly", false, function(enabled)
+ExploitCategory:Toggle("Fly", false, function(enabled)
     flyEnabled = enabled
     
     if enabled then
@@ -352,7 +354,7 @@ local flyToggle = ExploitCategory:Toggle("Fly", false, function(enabled)
 end)
 table.insert(uiElements.Universal, flyToggle)
 
-local noclipToggle = ExploitCategory:Toggle("Noclip", false, function(enabled)
+ExploitCategory:Toggle("Noclip", false, function(enabled)
     noclipEnabled = enabled
     
     task.spawn(function()
@@ -391,7 +393,6 @@ local noclipToggle = ExploitCategory:Toggle("Noclip", false, function(enabled)
         end)
     end)
 end)
-table.insert(uiElements.Universal, noclipToggle)
 
 -- Create Visual Category
 local VisualCategory = Window:CreateCategory("Visual", "👁️")
@@ -401,7 +402,7 @@ local fullbrightEnabled = false
 local originalLighting = {}
 local lightingConnection
 
-local fullbrightToggle = VisualCategory:Toggle("Fullbright", false, function(enabled)
+VisualCategory:Toggle("Fullbright", false, function(enabled)
     fullbrightEnabled = enabled
     
     if enabled then
@@ -467,10 +468,9 @@ fovLoop = task.spawn(function()
     end
 end)
 
-local fovSlider = VisualCategory:Slider("FOV", 70, 120, 70, function(value)
+VisualCategory:Slider("FOV", 70, 120, 70, function(value)
     desiredFOV = value
 end)
-table.insert(uiElements.Universal, fovSlider)
 
 -- ESP Variables (Universal)
 local espEnabled = {
@@ -761,7 +761,7 @@ local function createEntityESP()
 end
 
 -- ESP Dropdown (Universal)
-local espDropdown = VisualCategory:Dropdown("ESP", {"Door", "Objective", "Entity"}, function(selected)
+VisualCategory:Dropdown("ESP", {"Door", "Objective", "Entity"}, function(selected)
     if selected["Door"] and not espEnabled.Door then
         espEnabled.Door = true
         createDoorESP()
@@ -792,13 +792,12 @@ table.insert(uiElements.Universal, espDropdown)
 local entityNotifierEnabled = false
 local notifiedEntities = {}
 
-local entityNotifierToggle = VisualCategory:Toggle("Entity Notifier", false, function(enabled)
+VisualCategory:Toggle("Entity Notifier", false, function(enabled)
     entityNotifierEnabled = enabled
     if not enabled then
         notifiedEntities = {}
     end
 end)
-table.insert(uiElements.Universal, entityNotifierToggle)
 
 -- Entity Notifier Loop
 task.spawn(function()
@@ -890,46 +889,25 @@ task.spawn(function()
     end
 end)
 
--- Function to update UI based on floor
-local function updateUIForFloor(floor)
-    -- Hide/Show Hotel-specific features
-    for _, element in pairs(uiElements.Hotel) do
-        if element and element.SetVisible then
-            element:SetVisible(floor == "Hotel")
-        end
-    end
-    
-    -- Hide/Show Mines-specific features
-    for _, element in pairs(uiElements.Mines) do
-        if element and element.SetVisible then
-            element:SetVisible(floor == "Mines")
-        end
-    end
-    
-    -- Universal features are always visible
-end
-
--- Monitor floor changes and update UI
+-- Monitor floor changes
 task.spawn(function()
     while true do
         local newFloor = detectFloor()
         if newFloor ~= currentFloor then
             currentFloor = newFloor
-            updateUIForFloor(currentFloor)
             Window:Notify({
-                Text = "Floor detected: " .. currentFloor,
-                Duration = 3,
-                Type = "Info"
+                Text = "Floor changed to: " .. currentFloor .. ". Please rejoin or reload the script for updated features!",
+                Duration = 5,
+                Type = "Warning"
             })
         end
         task.wait(2)
     end
 end)
 
--- Initial floor detection and UI update
+-- Initial floor detection
 local initialFloor = detectFloor()
 currentFloor = initialFloor
-updateUIForFloor(currentFloor)
 Window:Notify({
     Text = "Current Floor: " .. currentFloor,
     Duration = 3,
