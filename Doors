@@ -96,7 +96,7 @@ ExploitCategory:Toggle("Disable Screech", false, function(enabled)
     end)
 end)
 
--- AntiSpeed Bypass Toggle (Hotel only)
+-- AntiSpeed Bypass Toggle (Hotel only, NOT for Mines)
 local antiSpeedEnabled = false
 local antiSpeedLoop
 local clonedCollision
@@ -221,12 +221,23 @@ local originalWalkSpeed = 16
 local speedValue = 16
 local speedLoop
 
--- Speed Toggle (Universal)
+-- Speed Toggle (Universal, works unless Mines floor)
 ExploitCategory:Toggle("Speed", false, function(enabled)
     if enabled and not antiSpeedEnabled and not bypassEnabled then
         Window:Notify({
             Text = "Please enable a bypass first! (AntiSpeed for Hotel, Anticheat for Mines)",
             Duration = 4,
+            Type = "Warning"
+        })
+        speedEnabled = false
+        return
+    end
+    
+    -- Only allow Speed on non-Mines floors
+    if currentFloor == "Mines" then
+        Window:Notify({
+            Text = "Speed is disabled on Mines floor!",
+            Duration = 3,
             Type = "Warning"
         })
         speedEnabled = false
@@ -288,10 +299,149 @@ ExploitCategory:Toggle("Speed", false, function(enabled)
 end)
 table.insert(uiElements.Universal, speedToggle)
 
+-- No Acceleration Toggle (Universal)
+local noAccelEnabled = false
+local noAccelLoop = nil
+local originalHrpProps = nil
+
+ExploitCategory:Toggle("No Acceleration", false, function(enabled)
+    noAccelEnabled = enabled
+
+    if enabled then
+        pcall(function()
+            local Players = game:GetService("Players")
+            local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+            local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+            local hrp = Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                originalHrpProps = hrp.CustomPhysicalProperties
+                hrp.CustomPhysicalProperties = PhysicalProperties.new(100, 0.7, 0, 1, 1)
+            end
+        end)
+
+        noAccelLoop = task.spawn(function()
+            while noAccelEnabled do
+                task.wait(0.5)
+                pcall(function()
+                    local Players = game:GetService("Players")
+                    local LocalPlayer = Players.LocalPlayer
+                    local Character = LocalPlayer and LocalPlayer.Character
+                    if Character then
+                        local hrp = Character:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            local cpp = hrp.CustomPhysicalProperties
+                            if not cpp or cpp.Density ~= 100 then
+                                hrp.CustomPhysicalProperties = PhysicalProperties.new(100, 0.7, 0, 1, 1)
+                            end
+                        end
+                    end
+                end)
+            end
+        end)
+    else
+        if noAccelLoop then
+            task.cancel(noAccelLoop)
+            noAccelLoop = nil
+        end
+
+        pcall(function()
+            local Players = game:GetService("Players")
+            local LocalPlayer = Players.LocalPlayer
+            local Character = LocalPlayer and LocalPlayer.Character
+            if Character then
+                local hrp = Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    hrp.CustomPhysicalProperties = originalHrpProps
+                end
+            end
+        end)
+
+        originalHrpProps = nil
+    end
+end)
+table.insert(uiElements.Universal, noAccelToggle)
+
 -- Speed Slider (Universal)
 ExploitCategory:Slider("Speed Value", 2, 250, 16, function(value)
     speedValue = value
 end)
+
+-- Proximity Prompt Reach Variables
+local proximityReach = 0
+
+-- Proximity Prompt Reach Slider (Universal)
+ExploitCategory:Slider("Proximity Prompt Reach", 0, 12, 0, function(value)
+    proximityReach = value
+end)
+
+-- Auto Proxi Variables
+local autoProxiEnabled = false
+local autoProxiLoop
+
+-- Auto Proxi Toggle (Universal)
+ExploitCategory:Toggle("Auto Proxi", false, function(enabled)
+    autoProxiEnabled = enabled
+    
+    if enabled then
+        autoProxiLoop = task.spawn(function()
+            while autoProxiEnabled do
+                task.wait(0.34)
+                pcall(function()
+                    local Players = game:GetService("Players")
+                    local LocalPlayer = Players.LocalPlayer
+                    local Character = LocalPlayer and LocalPlayer.Character
+                    
+                    if Character then
+                        local hrp = Character:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            -- Check all proximity prompts in the workspace
+                            for _, prompt in pairs(game:FindFirstChild("Workspace"):FindFirstChild("CurrentRooms"):GetDescendants() or {}) do
+                                if prompt:IsA("ProximityPrompt") then
+                                    local promptParent = prompt.Parent
+                                    local distance = (hrp.Position - promptParent.Position).Magnitude
+                                    
+                                    -- Check if player is in range (use proximity reach if > 0)
+                                    local range = promptParent:IsA("BasePart") and promptParent.Size.X or 0
+                                    if proximityReach > 0 then
+                                        range = proximityReach
+                                    else
+                                        range = prompt.MaxActivationDistance or 20
+                                    end
+                                    
+                                    if distance <= range then
+                                        local actionText = prompt.ActionText or ""
+                                        
+                                        -- Check for UnlockPrompt
+                                        if prompt.Name == "UnlockPrompt" then
+                                            prompt.HoldDuration = 0
+                                            prompt:InputHoldBegin()
+                                            prompt:InputHoldEnd()
+                                        -- Check ActionText for Open or Obtain
+                                        elseif actionText == "Open" or actionText == "Obtain" then
+                                            prompt:InputHoldBegin()
+                                            prompt:InputHoldEnd()
+                                        -- Don't interact if ActionText is Close
+                                        elseif actionText ~= "Close" then
+                                            -- Interact with other prompts
+                                            prompt:InputHoldBegin()
+                                            prompt:InputHoldEnd()
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end)
+            end
+        end)
+    else
+        if autoProxiLoop then
+            task.cancel(autoProxiLoop)
+            autoProxiLoop = nil
+        end
+    end
+end)
+table.insert(uiElements.Universal, autoProxiToggle)
 
 -- Fly and Noclip (Universal)
 local flyEnabled = false
