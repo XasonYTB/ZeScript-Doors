@@ -999,89 +999,177 @@ task.spawn(function()
                 elseif not ambushMoving and notifiedEntities["AmbushMoving"] then
                     notifiedEntities["AmbushMoving"] = nil
                 end
-                
-                -- Check for Eyes
-                local eyes = workspace:FindFirstChild("Eyes")
-                if eyes and not notifiedEntities["Eyes"] then
-                    notifiedEntities["Eyes"] = true
-                    Window:Notify({
-                        Text = "Eyes has appeared! Look away!",
-                        Duration = 5,
-                        Type = "Warning"
-                    })
-                elseif not eyes and notifiedEntities["Eyes"] then
-                    notifiedEntities["Eyes"] = nil
-                end
             end)
         end
     end
 end)
 
--- Monitor for new rooms (ESP update loop)
-task.spawn(function()
-    while true do
-        task.wait(1)
-        if espEnabled.Door then
-            createDoorESP()
-        end
-        if espEnabled.Objective then
-            createObjectiveESP()
-        end
-        if espEnabled.Entity then
-            createEntityESP()
-        end
+-- CREATE SETTINGS CATEGORY
+local SettingsCategory = Window:CreateCategory("Settings", "⚙️")
+
+-- Function to destroy the entire script
+local function destroyScript()
+    -- Disconnect all connections
+    if lightingConnection then
+        lightingConnection:Disconnect()
+    end
+    if fovConnection then
+        fovConnection:Disconnect()
+    end
+    
+    -- Cancel all running loops
+    if spoofCrouchLoop then
+        task.cancel(spoofCrouchLoop)
+    end
+    if antiSpeedLoop then
+        task.cancel(antiSpeedLoop)
+    end
+    if bypassLoop then
+        task.cancel(bypassLoop)
+    end
+    if speedLoop then
+        task.cancel(speedLoop)
+    end
+    if noAccelLoop then
+        task.cancel(noAccelLoop)
+    end
+    if autoProxiLoop then
+        task.cancel(autoProxiLoop)
+    end
+    if flyLoop then
+        task.cancel(flyLoop)
+    end
+    
+    -- Clear all ESP
+    clearESP("Door")
+    clearESP("Objective")
+    clearESP("Entity")
+    
+    -- Restore all modified properties
+    pcall(function()
+        local Players = game:GetService("Players")
+        local LocalPlayer = Players.LocalPlayer
+        local Character = LocalPlayer and LocalPlayer.Character
         
-        -- Update ladder ESP if bypass is enabled
-        if bypassEnabled then
-            for _, highlight in pairs(ladderESP) do
-                if highlight and highlight.Parent then
-                    highlight:Destroy()
+        if Character then
+            local Humanoid = Character:FindFirstChild("Humanoid")
+            if Humanoid then
+                Humanoid.WalkSpeed = originalWalkSpeed
+            end
+            
+            local hrp = Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.CustomPhysicalProperties = originalHrpProps
+            end
+            
+            if clonedCollision then
+                clonedCollision:Destroy()
+            end
+            
+            for _, part in pairs(Character:GetDescendants()) do
+                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                    part.CanCollide = true
                 end
             end
-            ladderESP = {}
-            
-            for _, room in pairs(workspace.CurrentRooms:GetChildren()) do
-                pcall(function()
-                    local ladder = room:FindFirstChild("Ladder", true)
-                    if ladder then
-                        local highlight = Instance.new("Highlight")
-                        highlight.FillColor = Color3.fromRGB(0, 100, 255)
-                        highlight.OutlineColor = Color3.fromRGB(0, 150, 255)
-                        highlight.FillTransparency = 0.5
-                        highlight.OutlineTransparency = 0
-                        highlight.Parent = ladder
-                        table.insert(ladderESP, highlight)
-                    end
-                end)
+        end
+    end)
+    
+    -- Restore lighting
+    if fullbrightEnabled then
+        local Lighting = game:GetService("Lighting")
+        for property, value in pairs(originalLighting) do
+            Lighting[property] = value
+        end
+    end
+    
+    -- Restore Screech
+    if screechDisabled and screechOriginalParent then
+        pcall(function()
+            local ReplicatedStorage = game:GetService("ReplicatedStorage")
+            local screech = ReplicatedStorage.Entities:FindFirstChild("Screech")
+            if screech then
+                screech.Parent = screechOriginalParent
             end
-        end
+        end)
     end
+    
+    -- Notify user
+    Window:Notify({
+        Text = "Script destroyed! All features disabled.",
+        Duration = 3,
+        Type = "Warning"
+    })
+    
+    -- Destroy the UI window
+    task.wait(0.5)
+    Window:Destroy()
+end
+
+-- Destroy Script Button
+SettingsCategory:Button("Destroy Script", function()
+    Window:Notify({
+        Text = "Are you sure? Press again to confirm.",
+        Duration = 3,
+        Type = "Warning"
+    })
+    
+    -- Wait for second confirmation
+    task.wait(3)
+    
+    -- Create a confirmation prompt
+    local confirmationWindow = Library:CreateWindow({
+        Title = "Confirm Destruction",
+        Size = Vector2.new(400, 150),
+        Keybind = Enum.KeyCode.RightShift
+    })
+    
+    local confirmCategory = confirmationWindow:CreateCategory("Confirmation", "⚠️")
+    confirmCategory:Label("Are you sure you want to destroy the script?")
+    confirmCategory:Button("YES - Destroy", function()
+        destroyScript()
+    end)
+    confirmCategory:Button("NO - Cancel", function()
+        confirmationWindow:Destroy()
+    end)
 end)
 
--- Monitor floor changes
-task.spawn(function()
-    while true do
-        local newFloor = detectFloor()
-        if newFloor ~= currentFloor then
-            currentFloor = newFloor
-            Window:Notify({
-                Text = "Floor changed to: " .. currentFloor .. ". Please rejoin or reload the script for updated features!",
-                Duration = 5,
-                Type = "Warning"
-            })
-        end
-        task.wait(2)
-    end
+-- Clear All Settings Button
+SettingsCategory:Button("Reset All Settings", function()
+    -- Disable all toggles
+    spoofCrouchEnabled = false
+    screechDisabled = false
+    antiSpeedEnabled = false
+    bypassEnabled = false
+    speedEnabled = false
+    noAccelEnabled = false
+    autoProxiEnabled = false
+    flyEnabled = false
+    noclipEnabled = false
+    fullbrightEnabled = false
+    entityNotifierEnabled = false
+    
+    -- Reset values
+    speedValue = 16
+    proximityReach = 0
+    desiredFOV = 70
+    
+    Window:Notify({
+        Text = "All settings have been reset!",
+        Duration = 2,
+        Type = "Success"
+    })
 end)
 
--- Initial floor detection
-local initialFloor = detectFloor()
-currentFloor = initialFloor
-Window:Notify({
-    Text = "Current Floor: " .. currentFloor,
-    Duration = 3,
-    Type = "Info"
-})
+-- Hide UI Button
+SettingsCategory:Button("Hide UI", function()
+    Window:SetVisible(false)
+end)
 
--- Show the window
-Window:Show()
+-- Show Info Button
+SettingsCategory:Button("Show Info", function()
+    Window:Notify({
+        Text = "ZeScript Doors v1.0 - Press RightShift to toggle UI",
+        Duration = 5,
+        Type = "Info"
+    })
+end)
