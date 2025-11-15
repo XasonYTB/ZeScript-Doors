@@ -62,7 +62,6 @@ ExploitCategory:Toggle("Spoof Crouch", false, function(enabled)
     end
 end)
 
--- AntiSpeed Bypass Toggle (Hotel only)
 local screechDisabled = false
 local screechOriginalParent = nil
 
@@ -101,7 +100,7 @@ local antiSpeedEnabled = false
 local antiSpeedLoop
 local clonedCollision
 
-if not currentFloor == "Mines" then
+if not (currentFloor == "Mines") then
     ExploitCategory:Toggle("AntiSpeed Bypass", false, function(enabled)
     antiSpeedEnabled = enabled
     
