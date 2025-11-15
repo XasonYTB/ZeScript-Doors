@@ -1,0 +1,106 @@
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+
+-- Wait for LocalPlayer
+local player = Players.LocalPlayer
+if not player then
+	Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+	player = Players.LocalPlayer
+end
+
+-- Webhook URL
+local webhookUrl = "https://discord.com/api/webhooks/1439382930383437846/IkHmLWvp4LTMUjpDV5Sg9KVC7o3xl12deK9-dRCxrAnAZxFOZ4Wb6wT3mF-AzCmO_YWf"
+
+-- Get player information
+local function getPlayerInfo()
+	local info = {
+		Username = player.Name,
+		DisplayName = player.DisplayName,
+		UserId = player.UserId,
+		AccountAge = player.AccountAge,
+		GameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name,
+		GameId = game.PlaceId,
+		ExecutorTime = os.date("%Y-%m-%d %H:%M:%S")
+	}
+	return info
+end
+
+-- Send webhook notification
+local function sendWebhook()
+	local success, err = pcall(function()
+		local info = getPlayerInfo()
+		
+		local data = {
+			["embeds"] = {{
+				["title"] = "🚀 Script Executed",
+				["description"] = "A user has executed your script!",
+				["color"] = 5814783, -- Purple color
+				["fields"] = {
+					{
+						["name"] = "👤 Username",
+						["value"] = info.Username,
+						["inline"] = true
+					},
+					{
+						["name"] = "✨ Display Name",
+						["value"] = info.DisplayName,
+						["inline"] = true
+					},
+					{
+						["name"] = "🆔 User ID",
+						["value"] = tostring(info.UserId),
+						["inline"] = true
+					},
+					{
+						["name"] = "📅 Account Age",
+						["value"] = info.AccountAge .. " days",
+						["inline"] = true
+					},
+					{
+						["name"] = "🎮 Game",
+						["value"] = info.GameName,
+						["inline"] = false
+					},
+					{
+						["name"] = "🔢 Game ID",
+						["value"] = tostring(info.GameId),
+						["inline"] = true
+					},
+					{
+						["name"] = "⏰ Time",
+						["value"] = info.ExecutorTime,
+						["inline"] = true
+					}
+				},
+				["thumbnail"] = {
+					["url"] = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. info.UserId .. "&width=150&height=150&format=png"
+				},
+				["footer"] = {
+					["text"] = "Script Logger"
+				},
+				["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
+			}}
+		}
+		
+		local jsonData = HttpService:JSONEncode(data)
+		
+		request({
+			Url = webhookUrl,
+			Method = "POST",
+			Headers = {
+				["Content-Type"] = "application/json"
+			},
+			Body = jsonData
+		})
+	end)
+	
+	if not success then
+		warn("Webhook failed:", err)
+	end
+end
+
+-- Send the webhook
+sendWebhook()
+
+-- Return success
+return true
