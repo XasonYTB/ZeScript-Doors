@@ -362,7 +362,6 @@ local antiSpeedEnabled = false
 local antiSpeedLoop
 local clonedCollision
 
-if not (currentFloor == "Mines") then
     HotelTab:Toggle("AntiSpeed Bypass", false, function(enabled)
         antiSpeedEnabled = enabled
         
@@ -409,9 +408,6 @@ if not (currentFloor == "Mines") then
             end
         end
     end, "Required for Speed on Hotel floor - bypasses anticheat")
-else
-    HotelTab:Label("⚠️ Hotel floor not detected")
-end
 
 -- Speed System (Hotel only)
 local speedEnabled = false
