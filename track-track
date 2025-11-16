@@ -299,14 +299,9 @@ player.AncestryChanged:Connect(function()
 	sendSessionEnd(executionCount)
 end)
 
--- Main execution
-print("📊 Updating execution count...")
 local count, isNew = updateExecutionCount()
 executionCount = count
 
-print("✅ Script logger initialized!")
-print("📊 Execution #" .. executionCount .. " for " .. player.Name)
-print("🔔 Sending Discord notification...")
 
 sendWebhook(executionCount, isNew)
 
