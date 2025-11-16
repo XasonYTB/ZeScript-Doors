@@ -419,7 +419,7 @@ local originalWalkSpeed = 16
 local speedValue = 16
 local speedLoop
 
-if not (currentFloor == "Mines") then
+
     HotelTab:Toggle("Speed", false, function(enabled)
         if enabled and not antiSpeedEnabled then
             Window:Notify({
@@ -488,7 +488,7 @@ if not (currentFloor == "Mines") then
     HotelTab:Slider("Speed Value", 2, 250, 16, function(value)
         speedValue = value
     end, "Set your desired walk speed (default: 16)")
-end
+
 
 -- ==================== MINES TAB ====================
 
