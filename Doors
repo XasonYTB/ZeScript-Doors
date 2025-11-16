@@ -789,10 +789,40 @@ local function createObjectiveESP()
                     table.insert(espHighlights.Objective, billboard)
                 end
             end
+            
+            -- Check for TimerLever
+            local timerLever = room:FindFirstChild("TimerLever")
+            if timerLever then
+                local highlight = Instance.new("Highlight")
+                highlight.FillColor = Color3.fromRGB(255, 255, 0)
+                highlight.OutlineColor = Color3.fromRGB(200, 200, 0)
+                highlight.FillTransparency = 0.5
+                highlight.OutlineTransparency = 0
+                highlight.Parent = timerLever
+                table.insert(espHighlights.Objective, highlight)
+                
+                local billboard = Instance.new("BillboardGui")
+                billboard.Name = "ObjectiveESP"
+                billboard.AlwaysOnTop = true
+                billboard.Size = UDim2.new(0, 100, 0, 50)
+                billboard.StudsOffset = Vector3.new(0, 2, 0)
+                billboard.Parent = timerLever
+                
+                local textLabel = Instance.new("TextLabel")
+                textLabel.Size = UDim2.new(1, 0, 1, 0)
+                textLabel.BackgroundTransparency = 1
+                textLabel.Text = "Timer Lever"
+                textLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+                textLabel.TextStrokeTransparency = 0
+                textLabel.TextScaled = true
+                textLabel.Font = Enum.Font.GothamBold
+                textLabel.Parent = billboard
+                
+                table.insert(espHighlights.Objective, billboard)
+            end
         end)
     end
 end
-
 -- Function to create ESP for entities
 local function createEntityESP()
     clearESP("Entity")
