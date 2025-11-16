@@ -201,6 +201,8 @@ UniversalTab:Toggle("Auto Proxi", false, function(enabled)
                     if not isRKeyHeld then
                         return
                     end
+
+                    print("TestBlah")
                     
                     local Players = game:GetService("Players")
                     local LocalPlayer = Players.LocalPlayer
