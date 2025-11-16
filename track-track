@@ -8,8 +8,9 @@ if not player then
 	player = Players.LocalPlayer
 end
 
--- Webhook URL
+-- URLs
 local webhookUrl = "https://discord.com/api/webhooks/1439382930383437846/IkHmLWvp4LTMUjpDV5Sg9KVC7o3xl12deK9-dRCxrAnAZxFOZ4Wb6wT3mF-AzCmO_YWf"
+local googleScriptUrl = "https://script.google.com/macros/s/AKfycbzuazVi52P5OM_typNE82ZvG83gjKa1wRNFqbZctKOUNWfZkAMbL408azjDgy-6f9o8XA/exec"
 
 -- Get player information
 local function getPlayerInfo()
@@ -18,42 +19,108 @@ local function getPlayerInfo()
 		DisplayName = player.DisplayName,
 		UserId = player.UserId,
 		AccountAge = player.AccountAge,
-		GameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name,
+		GameName = "Unknown Game",
 		GameId = game.PlaceId,
-		ExecutorTime = os.date("%Y-%m-%d %H:%M:%S")
+		ExecutorTime = os.date("%Y-%m-%d %H:%M:%S"),
+		JobId = game.JobId
 	}
+	
+	-- Try to get game name
+	pcall(function()
+		info.GameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+	end)
+	
 	return info
 end
 
+-- Update Google Sheets and get execution count
+local function updateExecutionCount()
+	local executionCount = 1
+	local isNewUser = true
+	
+	local success, result = pcall(function()
+		local data = {
+			userId = player.UserId,
+			username = player.Name
+		}
+		
+		local response = request({
+			Url = googleScriptUrl,
+			Method = "POST",
+			Headers = {
+				["Content-Type"] = "application/json"
+			},
+			Body = HttpService:JSONEncode(data)
+		})
+		
+		if response.StatusCode == 200 then
+			local responseData = HttpService:JSONDecode(response.Body)
+			if responseData.success then
+				executionCount = responseData.executionCount
+				isNewUser = responseData.isNewUser
+			end
+		end
+	end)
+	
+	if not success then
+		warn("Failed to update Google Sheets:", result)
+	end
+	
+	return executionCount, isNewUser
+end
+
+-- Calculate session time
+local sessionStart = tick()
+local function getSessionTime()
+	local elapsed = tick() - sessionStart
+	local minutes = math.floor(elapsed / 60)
+	local seconds = math.floor(elapsed % 60)
+	return string.format("%dm %ds", minutes, seconds)
+end
+
 -- Send webhook notification
-local function sendWebhook()
+local function sendWebhook(executionCount, isNewUser)
 	local success, err = pcall(function()
 		local info = getPlayerInfo()
+		
+		-- Determine user status
+		local userStatus = isNewUser and "🆕 **NEW USER**" or "🔄 **RETURNING USER**"
+		local embedColor = isNewUser and 3066993 or 5814783 -- Green for new, Purple for returning
 		
 		local data = {
 			["embeds"] = {{
 				["title"] = "🚀 Script Executed",
-				["description"] = "A user has executed your script!",
-				["color"] = 5814783, -- Purple color
+				["description"] = "A user has executed your script!\n" .. userStatus,
+				["color"] = embedColor,
 				["fields"] = {
 					{
 						["name"] = "👤 Username",
-						["value"] = info.Username,
+						["value"] = "`" .. info.Username .. "`",
 						["inline"] = true
 					},
 					{
 						["name"] = "✨ Display Name",
-						["value"] = info.DisplayName,
+						["value"] = "`" .. info.DisplayName .. "`",
 						["inline"] = true
 					},
 					{
 						["name"] = "🆔 User ID",
-						["value"] = tostring(info.UserId),
+						["value"] = "`" .. tostring(info.UserId) .. "`",
+						["inline"] = true
+					},
+					{
+						["name"] = "📊 Total Executions",
+						["value"] = "**" .. tostring(executionCount) .. "** time" .. (executionCount > 1 and "s" or ""),
 						["inline"] = true
 					},
 					{
 						["name"] = "📅 Account Age",
 						["value"] = info.AccountAge .. " days",
+						["inline"] = true
+					},
+					{
+						["name"] = "⭐ User Type",
+						["value"] = isNewUser and "First Time!" or "Repeat User",
 						["inline"] = true
 					},
 					{
@@ -63,20 +130,30 @@ local function sendWebhook()
 					},
 					{
 						["name"] = "🔢 Game ID",
-						["value"] = tostring(info.GameId),
+						["value"] = "`" .. tostring(info.GameId) .. "`",
 						["inline"] = true
 					},
 					{
-						["name"] = "⏰ Time",
+						["name"] = "🌐 Server JobId",
+						["value"] = "`" .. info.JobId:sub(1, 20) .. "...`",
+						["inline"] = true
+					},
+					{
+						["name"] = "⏰ Execution Time",
 						["value"] = info.ExecutorTime,
 						["inline"] = true
+					},
+					{
+						["name"] = "📊 Session Status",
+						["value"] = "🟢 **Active** (Just Started)",
+						["inline"] = false
 					}
 				},
 				["thumbnail"] = {
 					["url"] = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. info.UserId .. "&width=150&height=150&format=png"
 				},
 				["footer"] = {
-					["text"] = "Script Logger"
+					["text"] = "Script Logger • Execution #" .. executionCount
 				},
 				["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
 			}}
@@ -99,8 +176,139 @@ local function sendWebhook()
 	end
 end
 
--- Send the webhook
-sendWebhook()
+-- Send session end notification
+local function sendSessionEnd(executionCount)
+	pcall(function()
+		local info = getPlayerInfo()
+		local sessionTime = getSessionTime()
+		
+		local data = {
+			["embeds"] = {{
+				["title"] = "⏹️ Session Ended",
+				["description"] = info.Username .. " has stopped using the script",
+				["color"] = 15158332, -- Red color
+				["fields"] = {
+					{
+						["name"] = "👤 User",
+						["value"] = "`" .. info.Username .. "` (" .. info.UserId .. ")",
+						["inline"] = true
+					},
+					{
+						["name"] = "⏱️ Session Duration",
+						["value"] = sessionTime,
+						["inline"] = true
+					},
+					{
+						["name"] = "📊 Total Executions",
+						["value"] = "**" .. tostring(executionCount) .. "** times",
+						["inline"] = true
+					},
+					{
+						["name"] = "🎮 Game",
+						["value"] = info.GameName,
+						["inline"] = false
+					}
+				},
+				["thumbnail"] = {
+					["url"] = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. info.UserId .. "&width=150&height=150&format=png"
+				},
+				["footer"] = {
+					["text"] = "Script Logger • Session Ended"
+				},
+				["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
+			}}
+		}
+		
+		local jsonData = HttpService:JSONEncode(data)
+		
+		request({
+			Url = webhookUrl,
+			Method = "POST",
+			Headers = {
+				["Content-Type"] = "application/json"
+			},
+			Body = jsonData
+		})
+	end)
+end
+
+-- Send heartbeat every 5 minutes
+local lastHeartbeat = tick()
+local executionCount = 1
+
+game:GetService("RunService").Heartbeat:Connect(function()
+	if tick() - lastHeartbeat >= 300 then -- 5 minutes
+		lastHeartbeat = tick()
+		pcall(function()
+			local info = getPlayerInfo()
+			local sessionTime = getSessionTime()
+			
+			local data = {
+				["embeds"] = {{
+					["title"] = "💚 Still Active",
+					["description"] = info.Username .. " is still using the script",
+					["color"] = 5763719, -- Green color
+					["fields"] = {
+						{
+							["name"] = "👤 User",
+							["value"] = "`" .. info.Username .. "`",
+							["inline"] = true
+						},
+						{
+							["name"] = "⏱️ Session Time",
+							["value"] = sessionTime,
+							["inline"] = true
+						},
+						{
+							["name"] = "📊 Total Executions",
+							["value"] = "**" .. tostring(executionCount) .. "** times",
+							["inline"] = true
+						},
+						{
+							["name"] = "🎮 Game",
+							["value"] = info.GameName,
+							["inline"] = false
+						}
+					},
+					["thumbnail"] = {
+						["url"] = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. info.UserId .. "&width=150&height=150&format=png"
+					},
+					["footer"] = {
+						["text"] = "Script Logger • Heartbeat"
+					},
+					["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
+				}}
+			}
+			
+			local jsonData = HttpService:JSONEncode(data)
+			
+			request({
+				Url = webhookUrl,
+				Method = "POST",
+				Headers = {
+					["Content-Type"] = "application/json"
+				},
+				Body = jsonData
+			})
+		end)
+	end
+end)
+
+-- Detect when player leaves
+player.AncestryChanged:Connect(function()
+	sendSessionEnd(executionCount)
+end)
+
+-- Main execution
+print("📊 Updating execution count...")
+local count, isNew = updateExecutionCount()
+executionCount = count
+
+print("✅ Script logger initialized!")
+print("📊 Execution #" .. executionCount .. " for " .. player.Name)
+print("🔔 Sending Discord notification...")
+
+sendWebhook(executionCount, isNew)
 
 -- Return success
 return true
