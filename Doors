@@ -1327,3 +1327,9 @@ SettingsCategory:Label("══════════════════�
 -- Show the window
 wait(0.2)
 Window:Show()
+
+Window:Notify({
+                Text = "if you enjoy the script please like it!",
+                Duration = 25,
+                Type = "Warning"
+            })
