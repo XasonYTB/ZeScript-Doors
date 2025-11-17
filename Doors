@@ -1333,3 +1333,9 @@ Window:Notify({
                 Duration = 25,
                 Type = "Warning"
             })
+
+Window:Notify({
+                Text = "if your username is HexoSzef and your using Zenith, hi -Xason",
+                Duration = 25,
+                Type = "Warning"
+            })
