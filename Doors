@@ -4,9 +4,21 @@ if getgenv().ZeScriptLoaded then
 end
 getgenv().ZeScriptLoaded = true
 
+local HttpService = game:GetService("HttpService")
 -- Discord Configuration
-local DISCORD_API_URL = "https://5e6a4ce1-65e1-49da-a450-ac983707fc3b-00-s6e0zpq7bs82.janeway.replit.dev"
+local DISCORD_API_URL = "https://5e6a4ce1-65e1-49da-a450-ac983707fc3b-00-s6e0zpq7bs82.janeway.replit.dev:3000/"
 local GAME_ID = tostring(game.JobId) -- Unique ID for this server
+
+local success, result = pcall(function()
+    return HttpService:GetAsync(DISCORD_API_URL)
+end)
+
+if success then
+    print("✅ Successfully connected to Discord server!")
+    print(result)
+else
+    warn("❌ Failed to connect:", result)
+end
 
 -- Load XaLib UI Library
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/XasonYTB/XaLib/refs/heads/main/UILibrary.lua"))()
