@@ -5,7 +5,7 @@ end
 getgenv().ZeScriptLoaded = true
 
 -- Discord Configuration
-local DISCORD_API_URL = "https://replit.com/@AlexisXason/ZeScript-Discord-Bridge" -- CHANGE THIS!
+local DISCORD_API_URL = "https://5e6a4ce1-65e1-49da-a450-ac983707fc3b-00-s6e0zpq7bs82.janeway.replit.dev"
 local GAME_ID = tostring(game.JobId) -- Unique ID for this server
 
 -- Load XaLib UI Library
