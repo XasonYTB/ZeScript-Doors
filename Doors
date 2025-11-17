@@ -341,51 +341,69 @@ UniversalTab:Toggle("Auto Proxi", false, function(enabled)
     if enabled then
         autoProxiLoop = task.spawn(function()
             while autoProxiEnabled do
-                task.wait(0.34)
+                task.wait(0.1)
                 pcall(function()
                     -- Only run if R key is held
                     if not isRKeyHeld then
                         return
                     end
-
-                    print("TestBlah")
                     
                     local Players = game:GetService("Players")
                     local LocalPlayer = Players.LocalPlayer
                     local Character = LocalPlayer and LocalPlayer.Character
                     
-                    if Character then
-                        local hrp = Character:FindFirstChild("HumanoidRootPart")
-                        if hrp then
-                            -- Check all proximity prompts in the workspace
-                            for _, prompt in pairs(game:FindFirstChild("Workspace"):FindFirstChild("CurrentRooms"):GetDescendants() or {}) do
-                                if prompt:IsA("ProximityPrompt") then
-                                    local promptParent = prompt.Parent
-                                    local distance = (hrp.Position - promptParent.Position).Magnitude
+                    if not Character then return end
+                    
+                    local hrp = Character:FindFirstChild("HumanoidRootPart")
+                    if not hrp then return end
+                    
+                    local currentRooms = workspace:FindFirstChild("CurrentRooms")
+                    if not currentRooms then return end
+                    
+                    -- Check all proximity prompts in current rooms
+                    for _, descendant in pairs(currentRooms:GetDescendants()) do
+                        if descendant:IsA("ProximityPrompt") and descendant.Enabled then
+                            local promptParent = descendant.Parent
+                            
+                            -- Calculate distance to prompt
+                            local targetPos
+                            if promptParent:IsA("BasePart") then
+                                targetPos = promptParent.Position
+                            elseif promptParent:IsA("Model") then
+                                local primaryPart = promptParent.PrimaryPart or promptParent:FindFirstChildWhichIsA("BasePart")
+                                if primaryPart then
+                                    targetPos = primaryPart.Position
+                                end
+                            end
+                            
+                            if targetPos then
+                                local distance = (hrp.Position - targetPos).Magnitude
+                                
+                                -- Determine effective range
+                                local effectiveRange = proximityReach > 0 and proximityReach or descendant.MaxActivationDistance
+                                
+                                -- Check if in range
+                                if distance <= effectiveRange then
+                                    local actionText = descendant.ActionText or ""
                                     
-                                    -- Check if player is in range
-                                    local range = promptParent:IsA("BasePart") and promptParent.Size.X or 0
-                                    if proximityReach > 0 then
-                                        range = proximityReach
+                                    -- Skip "Close" actions
+                                    if actionText:lower():find("close") then
+                                        continue
+                                    end
+                                    
+                                    -- Handle unlock prompts
+                                    if descendant.Name == "UnlockPrompt" or actionText:lower():find("unlock") then
+                                        local originalHoldDuration = descendant.HoldDuration
+                                        descendant.HoldDuration = 0
+                                        fireproximityprompt(descendant)
+                                        task.wait(0.1)
+                                        descendant.HoldDuration = originalHoldDuration
                                     else
-                                        range = prompt.MaxActivationDistance or 20
+                                        -- Handle all other prompts
+                                        fireproximityprompt(descendant)
                                     end
                                     
-                                    if distance <= range then
-                                        local actionText = prompt.ActionText or ""
-                                        
-                                        if prompt.Name == "UnlockPrompt" then
-                                            prompt.HoldDuration = 0
-                                            prompt:InputHoldBegin()
-                                            prompt:InputHoldEnd()
-                                        elseif actionText == "Open" or actionText == "Obtain" then
-                                            prompt:InputHoldBegin()
-                                            prompt:InputHoldEnd()
-                                        elseif actionText ~= "Close" then
-                                            prompt:InputHoldBegin()
-                                            prompt:InputHoldEnd()
-                                        end
-                                    end
+                                    task.wait(0.2) -- Small delay to prevent spam
                                 end
                             end
                         end
@@ -400,7 +418,6 @@ UniversalTab:Toggle("Auto Proxi", false, function(enabled)
         end
     end
 end, "Automatically interacts with nearby prompts when holding R key")
-
 -- Fly and Noclip
 local flyEnabled = false
 local noclipEnabled = false
