@@ -1325,5 +1325,5 @@ SettingsCategory:Label("🔍 Use search box to find features")
 SettingsCategory:Label("═══════════════════")
 
 -- Show the window
-wait(1)
+wait(0.2)
 Window:Show()
