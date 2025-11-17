@@ -1,3 +1,10 @@
+if getgenv().ZeScriptLoaded then
+    warn("ZeScript is already running! Please destroy the existing instance first.")
+    return
+end
+getgenv().ZeScriptLoaded = true
+
+
 -- Load XaLib UI Library
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/XasonYTB/XaLib/refs/heads/main/UILibrary.lua"))()
 
