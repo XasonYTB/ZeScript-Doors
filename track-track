@@ -215,14 +215,6 @@ end
 
 -- Monitor chat messages (Legacy Chat)
 local function setupLegacyChatMonitoring()
-	pcall(function()
-		local ReplicatedModules = game:GetService("Chat"):WaitForChild("ClientChatModules")
-		local ChatSettings = require(ReplicatedModules:WaitForChild("ChatSettings"))
-		
-		player.Chatted:Connect(function(message)
-			sendChatWebhook(message)
-		end)
-	end)
 end
 
 -- Send webhook notification
