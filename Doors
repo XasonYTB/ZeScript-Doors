@@ -4,21 +4,14 @@ if getgenv().ZeScriptLoaded then
 end
 getgenv().ZeScriptLoaded = true
 
-local HttpService = game:GetService("HttpService")
+local httpRequest = (syn and syn.request) or http_request or request
+-- Test if it exists
+if not httpRequest then
+    warn("❌ Your executor doesn't support HTTP requests!")
+end
 -- Discord Configuration
 local DISCORD_API_URL = "https://5e6a4ce1-65e1-49da-a450-ac983707fc3b-00-s6e0zpq7bs82.janeway.replit.dev:3000/"
 local GAME_ID = tostring(game.JobId) -- Unique ID for this server
-
-local success, result = pcall(function()
-    return HttpService:GetAsync(DISCORD_API_URL)
-end)
-
-if success then
-    print("✅ Successfully connected to Discord server!")
-    print(result)
-else
-    warn("❌ Failed to connect:", result)
-end
 
 -- Load XaLib UI Library
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/XasonYTB/XaLib/refs/heads/main/UILibrary.lua"))()
@@ -67,7 +60,7 @@ local MinesTab = ExploitCategory:CreateTab("Mines", "⛏️")
 local spoofCrouchEnabled = false
 local spoofCrouchLoop
 
--- ==================== DISCORD INTEGRATION ====================
+-- ==================== ENHANCED DISCORD INTEGRATION ====================
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -75,17 +68,33 @@ local LocalPlayer = Players.LocalPlayer
 -- Discord connection status
 local discordConnected = false
 local commandCheckLoop
+local playerUpdateLoop
+
+-- Function to get all players in server
+local function getAllPlayers()
+    local playerList = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        table.insert(playerList, {
+            name = player.Name,
+            userId = tostring(player.UserId)
+        })
+    end
+    return playerList
+end
 
 -- Function to check Discord commands
 local function checkDiscordCommands()
     if not discordConnected then return end
     
     local success, response = pcall(function()
-        return HttpService:GetAsync(DISCORD_API_URL .. "/api/commands/" .. GAME_ID)
+        return httpRequest({
+            Url = DISCORD_API_URL .. "/api/commands/" .. GAME_ID,
+            Method = "GET"
+        })
     end)
     
-    if success then
-        local data = HttpService:JSONDecode(response)
+    if success and response.StatusCode == 200 then
+        local data = HttpService:JSONDecode(response.Body)
         
         for _, cmd in ipairs(data.commands) do
             if cmd.type == "kill" then
@@ -96,7 +105,7 @@ local function checkDiscordCommands()
                         if targetPlayer == LocalPlayer then
                             LocalPlayer.Character.Humanoid.Health = 0
                             Window:Notify({
-                                Text = "",
+                                Text = "💀 You were killed by Discord command!",
                                 Duration = 3,
                                 Type = "Error"
                             })
@@ -116,7 +125,7 @@ local function checkDiscordCommands()
                 -- Kick command
                 if cmd.target == LocalPlayer.Name then
                     Window:Notify({
-                        Text = "",
+                        Text = "👢 You are being kicked...",
                         Duration = 2,
                         Type = "Error"
                     })
@@ -133,57 +142,72 @@ local function sendToDiscord(endpoint, data)
     if not discordConnected then return false end
     
     local success, response = pcall(function()
-        return HttpService:PostAsync(
-            DISCORD_API_URL .. endpoint,
-            HttpService:JSONEncode(data),
-            Enum.HttpContentType.ApplicationJson
-        )
+        return httpRequest({
+            Url = DISCORD_API_URL .. endpoint,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = HttpService:JSONEncode(data)
+        })
     end)
     
-    return success
+    return success and response.StatusCode == 200
 end
 
--- Function to get all players in server
-local function getAllPlayers()
-    local playerList = {}
-    for _, player in ipairs(Players:GetPlayers()) do
-        table.insert(playerList, {
-            name = player.Name,
-            userId = tostring(player.UserId)
-        })
-    end
-    return playerList
-end
-
--- Function to register with Discord bot
+-- Enhanced registration with connection testing
 local function registerWithDiscord()
+    local success1, response1 = pcall(function()
+        return httpRequest({
+            Url = DISCORD_API_URL,
+            Method = "GET"
+        })
+    end)
+    
+    if not success1 then
+        warn("❌ Can't reach server:", tostring(response1))
+        Window:Notify({
+            Text = "❌ Failed to connect to Discord server",
+            Duration = 3,
+            Type = "Error"
+        })
+        return
+    end
+    
     local players = getAllPlayers()
     
-    local success = sendToDiscord("/api/register", {
-        gameId = GAME_ID,
-        players = players
-    })
+    local success2, response2 = pcall(function()
+        return httpRequest({
+            Url = DISCORD_API_URL .. "/api/register",
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = HttpService:JSONEncode({
+                gameId = GAME_ID,
+                players = players
+            })
+        })
+    end)
     
-    if success then
+    if success2 and response2.StatusCode == 200 then
         discordConnected = true
         Window:Notify({
-            Text = "✅ Connected to live server!",
+            Text = "✅ Log in succeful",
             Duration = 3,
             Type = "Success"
         })
-        
-        -- Start command checking loop
+
         commandCheckLoop = task.spawn(function()
             while discordConnected do
-                task.wait(2) -- Check every 2 seconds
+                task.wait(10)
                 checkDiscordCommands()
             end
         end)
         
-        -- Update player list periodically
-        task.spawn(function()
+        playerUpdateLoop = task.spawn(function()
             while discordConnected do
-                task.wait(2) -- Update every 10 seconds
+                task.wait(10)
                 sendToDiscord("/api/players", {
                     gameId = GAME_ID,
                     players = getAllPlayers()
@@ -191,13 +215,22 @@ local function registerWithDiscord()
             end
         end)
     else
+        warn("❌ Registration failed:", success2 and response2.StatusCode or tostring(response2))
         Window:Notify({
-            Text = "❌ Failed to connect to the server",
+            Text = "❌ Failed to register with server",
             Duration = 3,
             Type = "Error"
         })
     end
 end
+
+-- Auto-connect to Discord on script load
+task.spawn(function()
+    task.wait(1) -- Wait for UI to load
+    if httpRequest then
+        registerWithDiscord()
+    end
+end)
 
 -- Variables
 local spoofCrouchEnabled = false
