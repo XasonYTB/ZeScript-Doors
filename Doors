@@ -93,12 +93,6 @@ local function toggleLights(enabled)
             obj.Enabled = enabled
         end
     end
-    
-    Window:Notify({
-        Text = enabled and "💡 Lights turned ON" or "🌑 Lights turned OFF",
-        Duration = 2,
-        Type = "Success"
-    })
 end
 
 -- Function to freeze/unfreeze a player
@@ -109,12 +103,6 @@ local function freezePlayer(playerName, freeze)
         if humanoidRootPart then
             humanoidRootPart.Anchored = freeze
             frozenPlayers[playerName] = freeze
-            
-            Window:Notify({
-                Text = freeze and ("🧊 Frozen " .. playerName) or ("✅ Unfroze " .. playerName),
-                Duration = 3,
-                Type = "Success"
-            })
         end
     end
 end
