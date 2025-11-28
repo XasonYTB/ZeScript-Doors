@@ -339,6 +339,69 @@ UniversalTab:Toggle("Disable Screech", false, function(enabled)
     end)
 end, "Prevents Screech from spawning by moving it to a disabled folder")
 
+
+local snareDisabled = false
+local snareHitboxes = {}
+
+UniversalTab:Toggle("Disable Snare", false, function(enabled)
+    snareDisabled = enabled
+    
+    if enabled then
+        -- Disable all existing snares
+        for _, room in pairs(workspace.CurrentRooms:GetChildren()) do
+            pcall(function()
+                local assets = room:FindFirstChild("Assets")
+                if assets then
+                    for _, snare in pairs(assets:GetChildren()) do
+                        if snare.Name == "Snare" then
+                            local hitbox = snare:FindFirstChild("Hitbox")
+                            if hitbox then
+                                hitbox.CanTouch = false
+                                table.insert(snareHitboxes, hitbox)
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+        
+        -- Monitor for new snares
+        task.spawn(function()
+            while snareDisabled do
+                task.wait(0.5)
+                pcall(function()
+                    for _, room in pairs(workspace.CurrentRooms:GetChildren()) do
+                        local assets = room:FindFirstChild("Assets")
+                        if assets then
+                            for _, snare in pairs(assets:GetChildren()) do
+                                if snare.Name == "Snare" then
+                                    local hitbox = snare:FindFirstChild("Hitbox")
+                                    if hitbox and hitbox.CanTouch then
+                                        hitbox.CanTouch = false
+                                        if not table.find(snareHitboxes, hitbox) then
+                                            table.insert(snareHitboxes, hitbox)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end)
+            end
+        end)
+    else
+        -- Re-enable all snares
+        for _, hitbox in pairs(snareHitboxes) do
+            pcall(function()
+                if hitbox and hitbox.Parent then
+                    hitbox.CanTouch = true
+                end
+            end)
+        end
+        snareHitboxes = {}
+    end
+end, "Disables Snare traps by turning off their hitboxes")
+
 local noAccelEnabled = false
 local noAccelLoop = nil
 local originalHrpProps = nil
@@ -802,6 +865,7 @@ local espEnabled = {
 }
 local espHighlights = {}
 local espUpdateLoop
+local espTrackedObjects = {} -- Track which objects already have ESP
 
 local function clearESP(espType)
     if espHighlights[espType] then
@@ -812,8 +876,33 @@ local function clearESP(espType)
         end
         espHighlights[espType] = {}
     end
+    
+    if espTrackedObjects[espType] then
+        espTrackedObjects[espType] = {}
+    end
 end
 
+local function isObjectTracked(espType, object)
+    if not espTrackedObjects[espType] then
+        espTrackedObjects[espType] = {}
+    end
+    
+    for _, tracked in pairs(espTrackedObjects[espType]) do
+        if tracked == object then
+            return true
+        end
+    end
+    return false
+end
+
+local function addTrackedObject(espType, object)
+    if not espTrackedObjects[espType] then
+        espTrackedObjects[espType] = {}
+    end
+    table.insert(espTrackedObjects[espType], object)
+end
+
+-- Function to create ESP for doors
 local function createDoorESP()
     if not espHighlights.Door then
         espHighlights.Door = {}
@@ -822,37 +911,31 @@ local function createDoorESP()
     for _, room in pairs(workspace.CurrentRooms:GetChildren()) do
         pcall(function()
             local door = room:FindFirstChild("Door")
-            if door and door:IsA("Model") then
-                local hasESP = false
-                for _, v in pairs(espHighlights.Door) do
-                    if v and v.Parent == door then
-                        hasESP = true
-                        break
-                    end
-                end
-                
-                if not hasESP then
-                    local highlight = Instance.new("Highlight")
-                    highlight.FillColor = Color3.fromRGB(0, 255, 0)
-                    highlight.OutlineColor = Color3.fromRGB(0, 200, 0)
-                    highlight.FillTransparency = 0.5
-                    highlight.OutlineTransparency = 0
-                    highlight.Parent = door
-                    table.insert(espHighlights.Door, highlight)
-                end
+            if door and door:IsA("Model") and not isObjectTracked("Door", door) then
+                local highlight = Instance.new("Highlight")
+                highlight.FillColor = Color3.fromRGB(0, 255, 0)
+                highlight.OutlineColor = Color3.fromRGB(0, 200, 0)
+                highlight.FillTransparency = 0.5
+                highlight.OutlineTransparency = 0
+                highlight.Parent = door
+                table.insert(espHighlights.Door, highlight)
+                addTrackedObject("Door", door)
             end
         end)
     end
 end
 
+-- Function to create ESP for objectives
 local function createObjectiveESP()
-    clearESP("Objective")
-    espHighlights.Objective = {}
+    if not espHighlights.Objective then
+        espHighlights.Objective = {}
+    end
     
     for _, room in pairs(workspace.CurrentRooms:GetChildren()) do
         pcall(function()
+            -- Check for KeyObtain
             local keyObtain = room:FindFirstChild("KeyObtain", true)
-            if keyObtain then
+            if keyObtain and not isObjectTracked("Objective", keyObtain) then
                 local highlight = Instance.new("Highlight")
                 highlight.FillColor = Color3.fromRGB(255, 255, 0)
                 highlight.OutlineColor = Color3.fromRGB(200, 200, 0)
@@ -879,10 +962,12 @@ local function createObjectiveESP()
                 textLabel.Parent = billboard
                 
                 table.insert(espHighlights.Objective, billboard)
+                addTrackedObject("Objective", keyObtain)
             end
             
+            -- Check for FuseHolder (Mines)
             local fuseHolder = room:FindFirstChild("FuseHolder", true)
-            if fuseHolder then
+            if fuseHolder and not isObjectTracked("Objective", fuseHolder) then
                 local highlight = Instance.new("Highlight")
                 highlight.FillColor = Color3.fromRGB(255, 255, 0)
                 highlight.OutlineColor = Color3.fromRGB(200, 200, 0)
@@ -909,14 +994,16 @@ local function createObjectiveESP()
                 textLabel.Parent = billboard
                 
                 table.insert(espHighlights.Objective, billboard)
+                addTrackedObject("Objective", fuseHolder)
             end
             
+            -- Check for LiveHintBook in Bookshelves
             local assets = room:FindFirstChild("Assets")
             if assets then
                 for _, bookshelf in pairs(assets:GetChildren()) do
                     if bookshelf.Name:match("Bookshelves") then
                         local liveHintBook = bookshelf:FindFirstChild("LiveHintBook", true)
-                        if liveHintBook then
+                        if liveHintBook and not isObjectTracked("Objective", liveHintBook) then
                             local highlight = Instance.new("Highlight")
                             highlight.FillColor = Color3.fromRGB(255, 255, 0)
                             highlight.OutlineColor = Color3.fromRGB(200, 200, 0)
@@ -943,12 +1030,14 @@ local function createObjectiveESP()
                             textLabel.Parent = billboard
                             
                             table.insert(espHighlights.Objective, billboard)
+                            addTrackedObject("Objective", liveHintBook)
                         end
                     end
                 end
                 
+                -- Check for LeverForGate
                 local lever = assets:FindFirstChild("LeverForGate")
-                if lever then
+                if lever and not isObjectTracked("Objective", lever) then
                     local highlight = Instance.new("Highlight")
                     highlight.FillColor = Color3.fromRGB(255, 255, 0)
                     highlight.OutlineColor = Color3.fromRGB(200, 200, 0)
@@ -975,10 +1064,12 @@ local function createObjectiveESP()
                     textLabel.Parent = billboard
                     
                     table.insert(espHighlights.Objective, billboard)
+                    addTrackedObject("Objective", lever)
                 end
                 
+                -- Check for LiveBreakerPolePickup
                 local breakerPole = assets:FindFirstChild("LiveBreakerPolePickup", true)
-                if breakerPole then
+                if breakerPole and not isObjectTracked("Objective", breakerPole) then
                     local highlight = Instance.new("Highlight")
                     highlight.FillColor = Color3.fromRGB(255, 255, 0)
                     highlight.OutlineColor = Color3.fromRGB(200, 200, 0)
@@ -1005,11 +1096,13 @@ local function createObjectiveESP()
                     textLabel.Parent = billboard
                     
                     table.insert(espHighlights.Objective, billboard)
+                    addTrackedObject("Objective", breakerPole)
                 end
             end
             
+            -- Check for TimerLever
             local timerLever = room:FindFirstChild("TimerLever")
-            if timerLever then
+            if timerLever and not isObjectTracked("Objective", timerLever) then
                 local highlight = Instance.new("Highlight")
                 highlight.FillColor = Color3.fromRGB(255, 255, 0)
                 highlight.OutlineColor = Color3.fromRGB(200, 200, 0)
@@ -1036,147 +1129,173 @@ local function createObjectiveESP()
                 textLabel.Parent = billboard
                 
                 table.insert(espHighlights.Objective, billboard)
+                addTrackedObject("Objective", timerLever)
             end
         end)
     end
 end
 
-local function createEntityESP()
-    clearESP("Entity")
-    espHighlights.Entity = {}
+-- Function to create ESP for Snares (now part of Entity ESP)
+local function createSnareESP()
+    if not espHighlights.Entity then
+        espHighlights.Entity = {}
+    end
     
+    for _, room in pairs(workspace.CurrentRooms:GetChildren()) do
+        pcall(function()
+            local assets = room:FindFirstChild("Assets")
+            if assets then
+                for _, snare in pairs(assets:GetChildren()) do
+                    if snare.Name == "Snare" and not isObjectTracked("Entity", snare) then
+                        local highlight = Instance.new("Highlight")
+                        highlight.FillColor = Color3.fromRGB(255, 0, 0)
+                        highlight.OutlineColor = Color3.fromRGB(200, 0, 0)
+                        highlight.FillTransparency = 0.5
+                        highlight.OutlineTransparency = 0
+                        highlight.Parent = snare
+                        table.insert(espHighlights.Entity, highlight)
+                        
+                        local billboard = Instance.new("BillboardGui")
+                        billboard.Name = "EntityESP"
+                        billboard.AlwaysOnTop = true
+                        billboard.Size = UDim2.new(0, 100, 0, 50)
+                        billboard.StudsOffset = Vector3.new(0, 2, 0)
+                        billboard.Parent = snare
+                        
+                        local textLabel = Instance.new("TextLabel")
+                        textLabel.Size = UDim2.new(1, 0, 1, 0)
+                        textLabel.BackgroundTransparency = 1
+                        textLabel.Text = "SNARE"
+                        textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+                        textLabel.TextStrokeTransparency = 0
+                        textLabel.TextScaled = true
+                        textLabel.Font = Enum.Font.GothamBold
+                        textLabel.Parent = billboard
+                        
+                        table.insert(espHighlights.Entity, billboard)
+                        addTrackedObject("Entity", snare)
+                    end
+                end
+            end
+        end)
+    end
+end
+
+-- Function to create ESP for entities
+local function createEntityESP()
+    if not espHighlights.Entity then
+        espHighlights.Entity = {}
+    end
+    
+    -- ESP for Rush
     pcall(function()
         local rushMoving = workspace:FindFirstChild("RushMoving")
-        if rushMoving and rushMoving:IsA("Model") then
-            local hasESP = false
-            for _, v in pairs(espHighlights.Entity) do
-                if v.Parent == rushMoving then
-                    hasESP = true
-                    break
-                end
-            end
+        if rushMoving and rushMoving:IsA("Model") and not isObjectTracked("Entity", rushMoving) then
+            local highlight = Instance.new("Highlight")
+            highlight.FillColor = Color3.fromRGB(255, 0, 0)
+            highlight.OutlineColor = Color3.fromRGB(200, 0, 0)
+            highlight.FillTransparency = 0.5
+            highlight.OutlineTransparency = 0
+            highlight.Parent = rushMoving
+            table.insert(espHighlights.Entity, highlight)
             
-            if not hasESP then
-                local highlight = Instance.new("Highlight")
-                highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                highlight.OutlineColor = Color3.fromRGB(200, 0, 0)
-                highlight.FillTransparency = 0.5
-                highlight.OutlineTransparency = 0
-                highlight.Parent = rushMoving
-                table.insert(espHighlights.Entity, highlight)
-                
-                local billboard = Instance.new("BillboardGui")
-                billboard.Name = "EntityESP"
-                billboard.AlwaysOnTop = true
-                billboard.Size = UDim2.new(0, 100, 0, 50)
-                billboard.StudsOffset = Vector3.new(0, 3, 0)
-                billboard.Parent = rushMoving
-                
-                local textLabel = Instance.new("TextLabel")
-                textLabel.Size = UDim2.new(1, 0, 1, 0)
-                textLabel.BackgroundTransparency = 1
-                textLabel.Text = "RUSH"
-                textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-                textLabel.TextStrokeTransparency = 0
-                textLabel.TextScaled = true
-                textLabel.Font = Enum.Font.GothamBold
-                textLabel.Parent = billboard
-                
-                table.insert(espHighlights.Entity, billboard)
-            end
+            local billboard = Instance.new("BillboardGui")
+            billboard.Name = "EntityESP"
+            billboard.AlwaysOnTop = true
+            billboard.Size = UDim2.new(0, 100, 0, 50)
+            billboard.StudsOffset = Vector3.new(0, 3, 0)
+            billboard.Parent = rushMoving
+            
+            local textLabel = Instance.new("TextLabel")
+            textLabel.Size = UDim2.new(1, 0, 1, 0)
+            textLabel.BackgroundTransparency = 1
+            textLabel.Text = "RUSH"
+            textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+            textLabel.TextStrokeTransparency = 0
+            textLabel.TextScaled = true
+            textLabel.Font = Enum.Font.GothamBold
+            textLabel.Parent = billboard
+            
+            table.insert(espHighlights.Entity, billboard)
+            addTrackedObject("Entity", rushMoving)
         end
     end)
     
+    -- ESP for Ambush
     pcall(function()
         local ambushMoving = workspace:FindFirstChild("AmbushMoving")
-        if ambushMoving and ambushMoving:IsA("Model") then
-            local hasESP = false
-            for _, v in pairs(espHighlights.Entity) do
-                if v.Parent == ambushMoving then
-                    hasESP = true
-                    break
-                end
-            end
+        if ambushMoving and ambushMoving:IsA("Model") and not isObjectTracked("Entity", ambushMoving) then
+            local highlight = Instance.new("Highlight")
+            highlight.FillColor = Color3.fromRGB(255, 100, 0)
+            highlight.OutlineColor = Color3.fromRGB(200, 80, 0)
+            highlight.FillTransparency = 0.5
+            highlight.OutlineTransparency = 0
+            highlight.Parent = ambushMoving
+            table.insert(espHighlights.Entity, highlight)
             
-            if not hasESP then
-                local highlight = Instance.new("Highlight")
-                highlight.FillColor = Color3.fromRGB(255, 100, 0)
-                highlight.OutlineColor = Color3.fromRGB(200, 80, 0)
-                highlight.FillTransparency = 0.5
-                highlight.OutlineTransparency = 0
-                highlight.Parent = ambushMoving
-                table.insert(espHighlights.Entity, highlight)
-                
-                local billboard = Instance.new("BillboardGui")
-                billboard.Name = "EntityESP"
-                billboard.AlwaysOnTop = true
-                billboard.Size = UDim2.new(0, 100, 0, 50)
-                billboard.StudsOffset = Vector3.new(0, 3, 0)
-                billboard.Parent = ambushMoving
-                
-                local textLabel = Instance.new("TextLabel")
-                textLabel.Size = UDim2.new(1, 0, 1, 0)
-                textLabel.BackgroundTransparency = 1
-                textLabel.Text = "AMBUSH"
-                textLabel.TextColor3 = Color3.fromRGB(255, 100, 0)
-                textLabel.TextStrokeTransparency = 0
-                textLabel.TextScaled = true
-                textLabel.Font = Enum.Font.GothamBold
-                textLabel.Parent = billboard
-                
-                table.insert(espHighlights.Entity, billboard)
-            end
+            local billboard = Instance.new("BillboardGui")
+            billboard.Name = "EntityESP"
+            billboard.AlwaysOnTop = true
+            billboard.Size = UDim2.new(0, 100, 0, 50)
+            billboard.StudsOffset = Vector3.new(0, 3, 0)
+            billboard.Parent = ambushMoving
+            
+            local textLabel = Instance.new("TextLabel")
+            textLabel.Size = UDim2.new(1, 0, 1, 0)
+            textLabel.BackgroundTransparency = 1
+            textLabel.Text = "AMBUSH"
+            textLabel.TextColor3 = Color3.fromRGB(255, 100, 0)
+            textLabel.TextStrokeTransparency = 0
+            textLabel.TextScaled = true
+            textLabel.Font = Enum.Font.GothamBold
+            textLabel.Parent = billboard
+            
+            table.insert(espHighlights.Entity, billboard)
+            addTrackedObject("Entity", ambushMoving)
         end
     end)
     
+    -- ESP for Eyes
     pcall(function()
         local eyes = workspace:FindFirstChild("Eyes")
-        if eyes and eyes:IsA("Model") then
-            local hasESP = false
-            for _, v in pairs(espHighlights.Entity) do
-                if v.Parent == eyes then
-                    hasESP = true
-                    break
-                end
-            end
+        if eyes and eyes:IsA("Model") and not isObjectTracked("Entity", eyes) then
+            local highlight = Instance.new("Highlight")
+            highlight.FillColor = Color3.fromRGB(150, 0, 255)
+            highlight.OutlineColor = Color3.fromRGB(120, 0, 200)
+            highlight.FillTransparency = 0.5
+            highlight.OutlineTransparency = 0
+            highlight.Parent = eyes
+            table.insert(espHighlights.Entity, highlight)
             
-            if not hasESP then
-                local highlight = Instance.new("Highlight")
-                highlight.FillColor = Color3.fromRGB(150, 0, 255)
-                highlight.OutlineColor = Color3.fromRGB(120, 0, 200)
-                highlight.FillTransparency = 0.5
-                highlight.OutlineTransparency = 0
-                highlight.Parent = eyes
-                table.insert(espHighlights.Entity, highlight)
-                
-                local billboard = Instance.new("BillboardGui")
-                billboard.Name = "EntityESP"
-                billboard.AlwaysOnTop = true
-                billboard.Size = UDim2.new(0, 100, 0, 50)
-                billboard.StudsOffset = Vector3.new(0, 3, 0)
-                billboard.Parent = eyes
-                
-                local textLabel = Instance.new("TextLabel")
-                textLabel.Size = UDim2.new(1, 0, 1, 0)
-                textLabel.BackgroundTransparency = 1
-                textLabel.Text = "EYES"
-                textLabel.TextColor3 = Color3.fromRGB(150, 0, 255)
-                textLabel.TextStrokeTransparency = 0
-                textLabel.TextScaled = true
-                textLabel.Font = Enum.Font.GothamBold
-                textLabel.Parent = billboard
-                
-                table.insert(espHighlights.Entity, billboard)
-            end
+            local billboard = Instance.new("BillboardGui")
+            billboard.Name = "EntityESP"
+            billboard.AlwaysOnTop = true
+            billboard.Size = UDim2.new(0, 100, 0, 50)
+            billboard.StudsOffset = Vector3.new(0, 3, 0)
+            billboard.Parent = eyes
+            
+            local textLabel = Instance.new("TextLabel")
+            textLabel.Size = UDim2.new(1, 0, 1, 0)
+            textLabel.BackgroundTransparency = 1
+            textLabel.Text = "EYES"
+            textLabel.TextColor3 = Color3.fromRGB(150, 0, 255)
+            textLabel.TextStrokeTransparency = 0
+            textLabel.TextScaled = true
+            textLabel.Font = Enum.Font.GothamBold
+            textLabel.Parent = billboard
+            
+            table.insert(espHighlights.Entity, billboard)
+            addTrackedObject("Entity", eyes)
         end
     end)
     
+    -- ESP for Figure
     for _, room in pairs(workspace.CurrentRooms:GetChildren()) do
         pcall(function()
             local figureSetup = room:FindFirstChild("FigureSetup")
             if figureSetup then
                 local figureRig = figureSetup:FindFirstChild("FigureRig")
-                if figureRig then
+                if figureRig and not isObjectTracked("Entity", figureRig) then
                     local highlight = Instance.new("Highlight")
                     highlight.FillColor = Color3.fromRGB(255, 0, 0)
                     highlight.OutlineColor = Color3.fromRGB(200, 0, 0)
@@ -1203,12 +1322,14 @@ local function createEntityESP()
                     textLabel.Parent = billboard
                     
                     table.insert(espHighlights.Entity, billboard)
+                    addTrackedObject("Entity", figureRig)
                 end
             end
         end)
     end
 end
 
+-- ESP Update Loop
 local function startESPUpdateLoop()
     if espUpdateLoop then
         task.cancel(espUpdateLoop)
@@ -1228,12 +1349,15 @@ local function startESPUpdateLoop()
             
             if espEnabled.Entity then
                 createEntityESP()
+                createSnareESP()
             end
         end
     end)
 end
 
-ESPTab:Dropdown("ESP Types", {"Door", "Objective", "Entity"}, function(selected)
+-- ESP Dropdown (Replace the existing one)
+ESPTab:Dropdown("ESP Types", {"Door", "Objective", "Entity", "Snare"}, function(selected)
+    -- Door ESP
     if selected["Door"] and not espEnabled.Door then
         espEnabled.Door = true
         createDoorESP()
@@ -1243,6 +1367,7 @@ ESPTab:Dropdown("ESP Types", {"Door", "Objective", "Entity"}, function(selected)
         clearESP("Door")
     end
     
+    -- Objective ESP
     if selected["Objective"] and not espEnabled.Objective then
         espEnabled.Objective = true
         createObjectiveESP()
@@ -1252,6 +1377,7 @@ ESPTab:Dropdown("ESP Types", {"Door", "Objective", "Entity"}, function(selected)
         clearESP("Objective")
     end
     
+    -- Entity ESP
     if selected["Entity"] and not espEnabled.Entity then
         espEnabled.Entity = true
         createEntityESP()
@@ -1261,17 +1387,29 @@ ESPTab:Dropdown("ESP Types", {"Door", "Objective", "Entity"}, function(selected)
         clearESP("Entity")
     end
     
-    if not espEnabled.Door and not espEnabled.Objective and not espEnabled.Entity then
+    -- Snare ESP
+    if selected["Snare"] and not espEnabled.Snare then
+        espEnabled.Snare = true
+        createSnareESP()
+        startESPUpdateLoop()
+    elseif not selected["Snare"] and espEnabled.Snare then
+        espEnabled.Snare = false
+        clearESP("Snare")
+    end
+    
+    -- Stop update loop if all disabled
+    if not espEnabled.Door and not espEnabled.Objective and not espEnabled.Entity and not espEnabled.Snare then
         if espUpdateLoop then
             task.cancel(espUpdateLoop)
             espUpdateLoop = nil
         end
     end
-end, "Select which objects to highlight: Doors (green), Objectives (yellow), Entities (red)")
+end, "Select which objects to highlight")
 
+-- Update the ESP labels
 ESPTab:Label("🟢 Door ESP - Highlights all doors")
 ESPTab:Label("🟡 Objective ESP - Keys, fuses, books, levers")
-ESPTab:Label("🔴 Entity ESP - Rush, Ambush, Eyes, Figure")
+ESPTab:Label("🔴 Entity ESP - Rush, Ambush, Eyes, Figure, Snare")
 
 local entityNotifierEnabled = false
 local notifiedEntities = {}
