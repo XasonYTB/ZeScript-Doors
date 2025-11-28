@@ -1595,6 +1595,14 @@ DisplayTab:Slider("FOV", 70, 120, 70, function(value)
     desiredFOV = value
 end, "Adjust your field of view (default: 70)")
 
+local BetaCat = Window:CreateCategory("BETA", "⚠️")
+
+BetaCat:Button("Bypass A-90", function()
+    while wait(0.23) do
+        game.ReplicatedStorage.RemotesFolder.A90:FireServer("didnt")
+    end
+end, "Bypass's A-90 killing/Damaging you inside the rooms (works with modifier's on)")
+
 local SettingsCategory = Window:CreateCategory("Settings", "⚙️")
 
 local function destroyScript()
