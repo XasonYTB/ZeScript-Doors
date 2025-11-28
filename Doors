@@ -402,6 +402,166 @@ UniversalTab:Toggle("Disable Snare", false, function(enabled)
     end
 end, "Disables Snare traps by turning off their hitboxes")
 
+local snareDisabled = false
+local snareHitboxes = {}
+
+UniversalTab:Toggle("Disable Snare", false, function(enabled)
+    snareDisabled = enabled
+    
+    if enabled then
+        -- Disable all existing snares
+        for _, room in pairs(workspace.CurrentRooms:GetChildren()) do
+            pcall(function()
+                local assets = room:FindFirstChild("Assets")
+                if assets then
+                    for _, snare in pairs(assets:GetChildren()) do
+                        if snare.Name == "Snare" then
+                            local hitbox = snare:FindFirstChild("Hitbox")
+                            if hitbox then
+                                hitbox.CanTouch = false
+                                table.insert(snareHitboxes, hitbox)
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+        
+        -- Monitor for new snares
+        task.spawn(function()
+            while snareDisabled do
+                task.wait(0.5)
+                pcall(function()
+                    for _, room in pairs(workspace.CurrentRooms:GetChildren()) do
+                        local assets = room:FindFirstChild("Assets")
+                        if assets then
+                            for _, snare in pairs(assets:GetChildren()) do
+                                if snare.Name == "Snare" then
+                                    local hitbox = snare:FindFirstChild("Hitbox")
+                                    if hitbox and hitbox.CanTouch then
+                                        hitbox.CanTouch = false
+                                        if not table.find(snareHitboxes, hitbox) then
+                                            table.insert(snareHitboxes, hitbox)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end)
+            end
+        end)
+    else
+        -- Re-enable all snares
+        for _, hitbox in pairs(snareHitboxes) do
+            pcall(function()
+                if hitbox and hitbox.Parent then
+                    hitbox.CanTouch = true
+                end
+            end)
+        end
+        snareHitboxes = {}
+    end
+end, "Disables Snare traps by turning off their hitboxes")
+
+local objectBypassEnabled = false
+local disabledObjects = {}
+
+UniversalTab:Toggle("Object Bypass", false, function(enabled)
+    objectBypassEnabled = enabled
+    
+    if enabled then
+        -- Disable all existing dangerous objects
+        for _, room in pairs(workspace.CurrentRooms:GetChildren()) do
+            pcall(function()
+                local assets = room:FindFirstChild("Assets")
+                if assets then
+                    -- Check for ChandelierObstruction
+                    for _, chandelier in pairs(assets:GetChildren()) do
+                        if chandelier.Name == "ChandelierObstruction" then
+                            local collision = chandelier:FindFirstChild("Collision")
+                            if collision then
+                                collision.CanTouch = false
+                                collision.CanQuery = false
+                                table.insert(disabledObjects, collision)
+                            end
+                        end
+                    end
+                    
+                    -- Check for objects with AnimatedObstacleKill attribute
+                    for _, object in pairs(assets:GetDescendants()) do
+                        if object:IsA("Model") and object:GetAttribute("LoadModule") == "AnimatedObstacleKill" then
+                            -- Disable collision for all parts in the model
+                            for _, part in pairs(object:GetDescendants()) do
+                                if part:IsA("BasePart") then
+                                    part.CanTouch = false
+                                    part.CanQuery = false
+                                    if not table.find(disabledObjects, part) then
+                                        table.insert(disabledObjects, part)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+        
+        -- Monitor for new dangerous objects
+        task.spawn(function()
+            while objectBypassEnabled do
+                task.wait(0.5)
+                pcall(function()
+                    for _, room in pairs(workspace.CurrentRooms:GetChildren()) do
+                        local assets = room:FindFirstChild("Assets")
+                        if assets then
+                            -- Check for new ChandelierObstruction
+                            for _, chandelier in pairs(assets:GetChildren()) do
+                                if chandelier.Name == "ChandelierObstruction" then
+                                    local collision = chandelier:FindFirstChild("Collision")
+                                    if collision and collision.CanTouch then
+                                        collision.CanTouch = false
+                                        collision.CanQuery = false
+                                        if not table.find(disabledObjects, collision) then
+                                            table.insert(disabledObjects, collision)
+                                        end
+                                    end
+                                end
+                            end
+                            
+                            -- Check for new AnimatedObstacleKill objects
+                            for _, object in pairs(assets:GetDescendants()) do
+                                if object:IsA("Model") and object:GetAttribute("LoadModule") == "AnimatedObstacleKill" then
+                                    for _, part in pairs(object:GetDescendants()) do
+                                        if part:IsA("BasePart") and part.CanTouch then
+                                            part.CanTouch = false
+                                            part.CanQuery = false
+                                            if not table.find(disabledObjects, part) then
+                                                table.insert(disabledObjects, part)
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end)
+            end
+        end)
+    else
+        -- Re-enable all objects
+        for _, part in pairs(disabledObjects) do
+            pcall(function()
+                if part and part.Parent then
+                    part.CanTouch = true
+                    part.CanQuery = true
+                end
+            end)
+        end
+        disabledObjects = {}
+    end
+end, "Disables chandeliers and animated obstacles that can kill you")
+
 local noAccelEnabled = false
 local noAccelLoop = nil
 local originalHrpProps = nil
@@ -491,7 +651,7 @@ UniversalTab:Toggle("Auto Proxi", false, function(enabled)
     if enabled then
         autoProxiLoop = task.spawn(function()
             while autoProxiEnabled do
-                task.wait(0.1)
+                task.wait(0.01)
                 pcall(function()
                     if not isRKeyHeld then
                         return
@@ -560,105 +720,6 @@ UniversalTab:Toggle("Auto Proxi", false, function(enabled)
         end
     end
 end, "Automatically interacts with nearby prompts when holding R key")
-
-local flyEnabled = false
-local noclipEnabled = false
-local flyLoop
-
-UniversalTab:Toggle("Fly", false, function(enabled)
-    flyEnabled = enabled
-    
-    if enabled then
-        flyLoop = task.spawn(function()
-            local Players = game:GetService("Players")
-            local LocalPlayer = Players.LocalPlayer
-            local UserInputService = game:GetService("UserInputService")
-            
-            while flyEnabled do
-                task.wait()
-                pcall(function()
-                    local Character = LocalPlayer.Character
-                    if Character then
-                        local climbingAttr = Character:GetAttribute("Climbing")
-                        if climbingAttr == false or climbingAttr == nil then
-                            local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
-                            if HumanoidRootPart then
-                                local velocity = Vector3.new(0, 0, 0)
-                                
-                                if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-                                    velocity = velocity + (workspace.CurrentCamera.CFrame.LookVector * 2)
-                                end
-                                if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-                                    velocity = velocity - (workspace.CurrentCamera.CFrame.LookVector * 2)
-                                end
-                                if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-                                    velocity = velocity - (workspace.CurrentCamera.CFrame.RightVector * 2)
-                                end
-                                if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-                                    velocity = velocity + (workspace.CurrentCamera.CFrame.RightVector * 2)
-                                end
-                                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-                                    velocity = velocity + Vector3.new(0, 2, 0)
-                                end
-                                if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-                                    velocity = velocity - Vector3.new(0, 2, 0)
-                                end
-                                
-                                HumanoidRootPart.Velocity = velocity
-                                HumanoidRootPart.Anchored = false
-                            end
-                        end
-                    end
-                end)
-            end
-        end)
-    else
-        if flyLoop then
-            task.cancel(flyLoop)
-            flyLoop = nil
-        end
-    end
-end, "Use WASD to fly, Space to go up, Shift to go down")
-
-UniversalTab:Toggle("Noclip", false, function(enabled)
-    noclipEnabled = enabled
-    
-    task.spawn(function()
-        while noclipEnabled do
-            task.wait()
-            pcall(function()
-                local Players = game:GetService("Players")
-                local LocalPlayer = Players.LocalPlayer
-                local Character = LocalPlayer.Character
-                
-                if Character then
-                    local climbingAttr = Character:GetAttribute("Climbing")
-                    if climbingAttr == false or climbingAttr == nil then
-                        for _, part in pairs(Character:GetDescendants()) do
-                            if part:IsA("BasePart") then
-                                part.CanCollide = false
-                            end
-                        end
-                    end
-                end
-            end)
-        end
-        
-        pcall(function()
-            local Players = game:GetService("Players")
-            local LocalPlayer = Players.LocalPlayer
-            local Character = LocalPlayer.Character
-            
-            if Character then
-                for _, part in pairs(Character:GetDescendants()) do
-                    if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                        part.CanCollide = true
-                    end
-                end
-            end
-        end)
-    end)
-end, "Walk through walls and objects")
 
 local antiSpeedEnabled = false
 local antiSpeedLoop
