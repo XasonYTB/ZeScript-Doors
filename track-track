@@ -11,7 +11,7 @@ if not player then
 end
 
 -- URLs
-local webhookUrl = "https://discord.com/api/webhooks/1439382930383437846/IkHmLWvp4LTMUjpDV5Sg9KVC7o3xl12deK9-dRCxrAnAZxFOZ4Wb6wT3mF-AzCmO_YWf"
+local webhookUrl = "https://discord.com/api/webhooks/1444415194716573797/6tyoftw9Pa2QzHkZcj3AocZEl7if6QYtvxAFAbN71ecq83aEiKCWZP9VEzmkcPM-JdUK"
 local googleScriptUrl = "https://script.google.com/macros/s/AKfycbzuazVi52P5OM_typNE82ZvG83gjKa1wRNFqbZctKOUNWfZkAMbL408azjDgy-6f9o8XA/exec"
 
 -- Detect executor
